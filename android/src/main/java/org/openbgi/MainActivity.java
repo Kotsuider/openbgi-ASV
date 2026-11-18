@@ -24,6 +24,7 @@ public final class MainActivity extends Activity {
     private GameDocuments documents;
     private TranslationConfig translation;
     private final ArrayList<Paint> fonts = new ArrayList<>();
+    private Typeface externalTypeface;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -133,11 +134,27 @@ public final class MainActivity extends Activity {
         return table;
     }
 
-    private int fontOpen(int height, int width, int bold, int italic) {
+    private boolean fontAddFile(String path) {
+        int fd = documents.openOriginal(path.replace('\\', '/'));
+        if (fd < 0) return false;
+        try (android.os.ParcelFileDescriptor file = android.os.ParcelFileDescriptor.adoptFd(fd)) {
+            Typeface loaded = new Typeface.Builder(file.getFileDescriptor()).build();
+            if (loaded == null) return false;
+            externalTypeface = loaded;
+            android.util.Log.i("OpenBGI", "Loaded command-line font " + path);
+            return true;
+        } catch (java.io.IOException | RuntimeException error) {
+            android.util.Log.w("OpenBGI", "Cannot load command-line font " + path, error);
+            return false;
+        }
+    }
+
+    private int fontOpen(String family, int height, int width, int weight, int italic) {
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setColor(Color.WHITE);
-        paint.setTypeface(Typeface.create(translation.typeface(), (bold != 0 ? Typeface.BOLD : 0)
-                | (italic != 0 ? Typeface.ITALIC : 0)));
+        Typeface base = family == null ? translation.typeface() : Typeface.create(family, Typeface.NORMAL);
+        if (externalTypeface != null) base = externalTypeface;
+        paint.setTypeface(Typeface.create(base, weight, italic != 0));
         paint.setTextSize(100);
         Paint.FontMetrics metrics = paint.getFontMetrics();
         paint.setTextSize(height * 100f / (metrics.descent - metrics.ascent));

@@ -49,6 +49,30 @@ static int CharInSet(const char* p, const char* set)
 
 // ---- measuring ---------------------------------------------------------------------------------
 
+int Text_GlyphProportional(uint32_t code, int proportional)
+{
+	if(proportional)
+		return 1;
+	if(gTextUtf8)
+		return (code >= 0x0400 && code <= 0x052f) || (code >= 0x2de0 && code <= 0x2dff) ||
+			(code >= 0xa640 && code <= 0xa69f);
+	return (code >= 0x8440 && code <= 0x8460) ||
+		(code >= 0x8470 && code <= 0x847e) || (code >= 0x8480 && code <= 0x8491);
+}
+
+int Text_NaturalSpacing(uint32_t code)
+{
+	const char* width = getenv("OPENBGI_FONT_WIDTH");
+	return width && strcmp(width, "0") == 0 &&
+		(Text_GlyphProportional(code, 0) || (code >= 0x20 && code < 0x7f));
+}
+
+int Text_SpacedAdvance(int advance)
+{
+	int spaced = advance + gTextLetterSpacing;
+	return gTextLetterSpacing && spaced < 1 ? 1 : spaced;
+}
+
 /* measure `str` in the cache font `font`: out[0] is the advance of the
  * whole string, out[1] the ink extent (without half of the first and last
  * proportional gaps), out[2] the advance up to the middle of the last gap.
@@ -69,7 +93,7 @@ int Text_Measure(int32_t out[3], const char* str, int font, int proportional)
 int Text_MeasureInfo(int32_t out[3], const char* str, const FontInfo_t* fi, int proportional)
 {
 	Bmp_t cell;
-	int glyphW, total = 0, firstHalf = 0, first = 1, gap = 0, pitch;
+	int glyphW, total = 0, firstHalf = 0, first = 1, gap = 0, pitch, lastPitch = 0;
 
 	pitch = proportional ? 0 : gCharPitch;
 	if(!proportional && gEngine->gen >= GEN_1_529 && fi->font)
@@ -85,11 +109,20 @@ int Text_MeasureInfo(int32_t out[3], const char* str, const FontInfo_t* fi, int 
 		int dbcs = TextIsWide(code, len);
 
 		Text_PaintGlyph(&view, &g, (int)code, fi->font, 0xffffff);
-		if(proportional)
+		if(Text_NaturalSpacing(code))
+		{
+			int advance = FontRaster_Advance(fi->font, (int)code);
+			total += Text_SpacedAdvance(advance > 0 ? advance : g.right + 1);
+			gap = 0;
+			lastPitch = 0;
+			first = 0;
+		}
+		else if(Text_GlyphProportional(code, proportional))
 		{
 			Bmp_CropGlyph(&view, &g);
 			gap = Font_GapFor2(&g, glyphW);
-			total += view.w + gap;
+			total += Text_SpacedAdvance(view.w + gap);
+			lastPitch = 0;
 			if(first)
 			{
 				first = 0;
@@ -100,12 +133,14 @@ int Text_MeasureInfo(int32_t out[3], const char* str, const FontInfo_t* fi, int 
 		{
 			int w = dbcs ? glyphW : glyphW / 2;
 			gap = 0;
-			total += w + pitch;
+			total += Text_SpacedAdvance(w + pitch);
+			lastPitch = pitch;
+			first = 0;
 		}
 		str += len;
 	}
 	BGI_Free(cell.pixels);
-	total -= pitch; // no pitch after the last character
+	total -= lastPitch; // no pitch after the last character
 	out[0] = total;
 	out[1] = total + (gap >> 1) - firstHalf - gap;
 	out[2] = total + (gap >> 1) - gap;
@@ -142,11 +177,22 @@ int Text_AbcWidths(int32_t* out, int32_t* outCount, const char* str, int font)
 			Text_PaintGlyph(&view, &g, (int)code, fi.font, 0xffffff);
 			a = g.left;
 			b = g.right >= g.left ? g.right - g.left + 1 : 0;
+			if(Text_NaturalSpacing(code))
+			{
+				adv = FontRaster_Advance(fi.font, (int)code);
+				if(adv <= 0)
+					adv = g.right + 1;
+			}
+			else if(Text_GlyphProportional(code, 0))
+			{
+				adv = b + Font_GapFor2(&g, glyphW);
+				a = 0;
+			}
 			if(!b)
 				a = 0;
 			out[n * 3] = a;
 			out[n * 3 + 1] = b;
-			out[n * 3 + 2] = adv - a - b;
+			out[n * 3 + 2] = Text_SpacedAdvance(adv) - a - b;
 		}
 		n++;
 		str += len;

@@ -144,8 +144,13 @@ EM_JS(int, WasmJs_FontAdvance, (int id, int cp), {
 
 int OS_FontAddFile(const char* path)
 {
+#if defined(BGI_ANDROID)
+	extern int WasmJs_FontAddFile(const char* path);
+	return WasmJs_FontAddFile(path);
+#else
 	BGI_UNUSED(path);
 	return 0; // the page draws with the browser's fonts; the fallback faces apply
+#endif
 }
 
 int OS_FontAddMemory(const void* data, uint32_t size)

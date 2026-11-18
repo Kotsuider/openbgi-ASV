@@ -29,6 +29,10 @@ This fork builds a standalone Android application.
   resized, styled or hidden.
 - **Local saves, Vorbis audio and a readable launch log.** The log records
   the last game launch. The launcher has eleven interface languages.
+- **Cyrillic text and font options.** Horizontal Russian text supports
+  proportional spacing and word wrapping. Font size, width, weight,
+  family and extra letter spacing can be set in launch arguments.
+  See the [font settings guide](android/README.md#russian-text-and-font-settings).
 
 ## Quick start
 
@@ -59,6 +63,181 @@ use the `.bpfa` extension. The translation settings support
 `font_manager` resource files with font creation override. See the
 [Android guide](android/README.md) for lookup and override rules.
 
+## Translation patch methods
+
+OpenBGI reads translated archives, scripts and images through its own
+engine. A patch can also depend on font settings or hooks supplied by the
+original game's modified EXE or a Windows proxy DLL. The methods below
+describe the parts currently reproduced by this fork.
+
+### UIF configuration and loose files — H2O
+
+Universal Injector Framework (UIF) commonly runs through a proxy such as
+`winmm.dll`. Its JSON configuration tells the Windows game how to redirect
+resource requests, substitute characters and select a replacement font.
+For example, a request for a script can be redirected to `patch/<name>`,
+giving the translated file priority over the archive.
+
+The Android host implements a subset of this configuration directly.
+Place the patch files, JSON and fonts in the selected game folder. It
+reads the file named by `OBAConfig.json`'s `uif` field, then tries
+`uif_config.json` and `config.json`. Supported features include the following.
+
+- `file_monitor.actions` with regex `pattern` and `redirect` fields.
+  An enabled action redirects to a matching file in the game folder.
+  With no `file_monitor` section, extensionless resources and `._bp`
+  programs are looked up under `patch/` first.
+- `character_substitution` with positional pairs from
+  `source_characters` and `target_characters`. The same substitutions
+  are used for drawing and measuring glyphs.
+- Enabled `font_manager` and `spoof_creation`, loading a font from
+  `resource_files`. A nonempty `override_face` is matched against the
+  resource filename without its extension.
+
+H2O uses loose translated resources, a replacement font and character
+substitution. Its launcher configuration can use these fields.
+
+```json
+{
+  "uif": "config.json",
+  "arguments": "--productname=H2ORTAAACSE"
+}
+```
+
+For Windows OpenBGI, select the profile and product name in
+`OpenBGI.cmd`.
+
+```bat
+@echo off
+setlocal
+cd /d "%~dp0"
+start "" "OpenBGI.exe" --engine=1.69/472 --productname=H2ORTAAACSE
+```
+
+This command supplies the launch settings. Windows OpenBGI currently
+needs the translated resources and font adaptation prepared separately;
+it does not read the Android host's UIF JSON configuration. When running
+the original Windows game with UIF, keep its proxy DLL and the patch's
+`config.json` together.
+
+The translated font may place its intended glyphs at other character
+positions. Preserve the patch's font and substitution table together.
+The UIF configuration support described here is implemented in the
+Android host. Windows OpenBGI currently uses its own launch options.
+UIF's executable hooks, window-title overrides and other unimplemented
+JSON sections are outside this subset.
+
+### Repacked resources and a modified EXE — Itsusora
+
+This method replaces scripts and images inside the game's archives.
+The translation also patches the original EXE to change font creation,
+character widths or line breaking. OpenBGI can read the repacked resources;
+the EXE's code changes must be reproduced through engine settings.
+
+The examined Itsusora translation sets Segoe UI, a height of 24 pixels,
+natural character width and regular weight. Its Windows launch script
+uses these settings with an adjustable letter-spacing value.
+
+```bat
+@echo off
+setlocal
+cd /d "%~dp0"
+start "" "OpenBGI.exe" --engine=1.66 --productname=ItsukaTodokuAnoSorani --font-face="Segoe UI" --font-size=24 --font-width=0 --font-weight=400 --letter-spacing=2
+```
+
+On Android, select profile `1.66` in game settings and place the launch
+arguments in `OBAConfig.json`.
+
+```json
+{
+  "arguments": "--productname=ItsukaTodokuAnoSorani --font-size=24 --font-width=0 --font-weight=400 --letter-spacing=2"
+}
+```
+
+To use a font file on Android, place it in the game folder and add
+`--font-file` directly to the arguments. For example, with
+`SegoeUI.ttf` beside the archives.
+
+```json
+{
+  "arguments": "--productname=ItsukaTodokuAnoSorani --font-file=SegoeUI.ttf --font-size=24 --font-width=0 --font-weight=400 --letter-spacing=2"
+}
+```
+
+Use the actual font filename. Paths are relative to the selected game
+folder. On Android the loaded file takes priority over the UIF font and
+`--font-face`. Without a file override, the existing font selection applies.
+
+The `2` is a manually selected spacing adjustment for this translation.
+Tune it against the original game's rendering.
+
+| Launch option | Effect |
+| --- | --- |
+| `--font-face="NAME"` | Override the font family. The font must be available on the target platform. |
+| `--font-file=FILE.ttf` | Load a font file on Windows or Android before the game creates its fonts. Android paths are relative to the selected game folder. |
+| `--font-size=N` | Rasterised font height, 4..200 pixels. The script still supplies layout size and line spacing. |
+| `--font-width=N` | Average rasterised character width, 0..200 pixels. Zero uses natural proportions and advances for Cyrillic and ASCII. |
+| `--font-weight=N` | Font weight on Windows and Android, 1..1000. Regular is 400 and bold is 700. |
+| `--letter-spacing=N` | Extra horizontal advance per character, including spaces, from -16 to 64 pixels. Positive values spread text out and negative values tighten it. |
+
+Spacing defaults to zero and is included in text measurement and wrapping.
+It applies to horizontal text, including bidirectional text. Vertical
+text and ruby readings retain their existing spacing. The script's
+encoding must also match the translation. Cyrillic is supported in
+CP932 and in the engine's UTF-8 mode.
+
+On Android, enter the options in the game's **Arguments** field or the
+`arguments` string in `OBAConfig.json`. Android uses its available system
+families or a font loaded through the supported UIF configuration.
+See the [Android font guide](android/README.md#russian-text-and-font-settings).
+
+### VNTextPatch and font-proxy patches — Eustia
+
+Some translations store Russian text as Latin character codes and put
+Russian glyphs at those positions in a custom font. The accompanying
+Windows DLL loads that font and changes the game's font selection.
+Running the translated resources with a regular Latin font then displays
+the encoded Latin text.
+
+The examined Eustia patch includes `EustiaFont.ttf`, whose internal family
+name is **EET**. Drawing its Latin alphabet produces Russian letters.
+The accompanying `version.dll` identifies its build as `VNTextProxy`,
+registers the TTF and replaces the requested font family with EET.
+This describes the examined package's font proxy; other VNTextPatch
+distributions can use different hooks and resource layouts.
+
+Windows OpenBGI loads the font directly through these launch options.
+
+```bat
+@echo off
+setlocal
+cd /d "%~dp0"
+start "" "OpenBGI.exe" --engine=1.529 --productname=AiyokunoEustia_Product --font-file=EustiaFont.ttf --font-face=EET --font-width=0 --letter-spacing=0
+```
+
+Keep the script's encoded character values when using this font. The
+glyph replacement is supplied by the font itself. The family's internal
+name, EET, differs from the filename.
+
+Eustia's `d3d9.dll` also scales requested font widths greater than 30 to
+80% of their original value. The example above uses natural width as a
+tested alternative setup. Text rendering was checked on Windows.
+The original EXE reports BGI 1.521.4, and `1.529` is a provisional
+compatibility profile. Full playthrough compatibility remains unverified.
+
+On Android, select profile `1.529` in game settings, keep
+`EustiaFont.ttf` in the game folder, and use this `OBAConfig.json`.
+
+```json
+{
+  "arguments": "--productname=AiyokunoEustia_Product --font-file=EustiaFont.ttf --font-width=0 --letter-spacing=0"
+}
+```
+
+The Android host uses the loaded file directly, so the internal family
+name can be omitted. The font-file option is implemented on Android;
+Eustia's text rendering has been verified on Windows.
+
 ## Compatibility and builds
 
 - **H2O after and another Complete Story Edition** was tested on Android
@@ -74,6 +253,22 @@ use the `.bpfa` extension. The translation settings support
 See the [Android build and signing guide](android/README.md).
 Compatibility statuses in the upstream section below refer to the
 upstream project unless noted above.
+
+## Windows release
+
+The experimental Windows package is `OpenBGI-ASV-0.2-windows-x86.zip`.
+Extract it into its own folder and run `OpenBGI.exe` to open the game
+picker. Select a game directory and use **Advanced** for its engine
+profile and launch arguments. The launcher records games in `games.json`.
+
+When started inside a game folder containing `system.arc` or
+`ipl._bp`, OpenBGI starts that game directly. Run `OpenBGI-Launcher.cmd`
+or pass `--launcher` to always open the picker.
+
+Itsusora and Eustia have been checked on Windows for launch and Russian
+text rendering with the options above. Full playthroughs remain
+unverified. This package includes the engine, its licenses and a short
+usage guide. Supply game files and translation fonts separately.
 
 ## Licensing and credits
 

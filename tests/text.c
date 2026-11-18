@@ -545,6 +545,90 @@ static void TestLayoutExtensions(void)
 }
 
 // run every group; exit status 1 when any check failed
+/* CP932 Cyrillic must use the same spacing when scripts request fixed
+ * or proportional text, including the measurement used for centring. */
+static void TestCyrillicSpacing(void)
+{
+	BmpMgr_t* mgr = BmpMgr_New(8);
+	RubyDict_t dict = {0};
+	Rect_t area = {0, 0, 639, 199};
+	int font = 0, mode, encoding;
+	int32_t measured[2][3], ends[2], style[5] = {0};
+	const char* samples[] = {
+		"\x84\x50\x84\x82\x84\x79\x84\x72\x84\x75\x84\x84", // Привет in CP932
+		"\xd0\x9f\xd1\x80\xd0\xb8\xd0\xb2\xd0\xb5\xd1\x82"
+	};
+	printf("Cyrillic spacing\n");
+	Text_SetBmpMgrPtr(mgr);
+	Engine_SelectProfile("1.66");
+	if(BmpMgr_FontOpen(mgr, &font, "Arial", 24, 100, 0) != 0)
+	{
+		CHECK(0);
+		BmpMgr_Delete(mgr);
+		return;
+	}
+	gTextDirection = 0;
+	gCharPitch = 0;
+	for(encoding = 0; encoding < 2; encoding++)
+	{
+		gTextUtf8 = encoding;
+		OS_SetTextEncoding(encoding);
+		for(mode = 0; mode < 2; mode++)
+		{
+			RichState_t rich = {0};
+			int32_t cur[2] = {0}, lines;
+			CHECK(Text_Measure(measured[mode], samples[encoding], font, mode) == 1);
+			CHECK(Text_LayoutCoreH(&rich, &lines, samples[encoding], 0, &dict, cur, &area,
+				24, font, mode, 0, 0xffffff, style) == 1);
+			ends[mode] = cur[0];
+			RichState_Free(&rich);
+		}
+		CHECK(ends[0] == ends[1]);
+		CHECK(measured[0][0] == ends[0]);
+		CHECK(measured[1][0] == ends[1]);
+		CHECK(ends[0] > 0 && ends[0] < 6 * 24);
+		{
+			int spacing;
+			for(spacing = -1; spacing <= 2; spacing++)
+			{
+				RichState_t rich = {0};
+				int32_t measuredSpaced[3], cur[2] = {0}, lines;
+				gTextLetterSpacing = spacing;
+				CHECK(Text_Measure(measuredSpaced, samples[encoding], font, 0) == 1);
+				CHECK(Text_LayoutCoreH(&rich, &lines, samples[encoding], 0, &dict, cur, &area,
+					24, font, 0, 0, 0xffffff, style) == 1);
+				CHECK(cur[0] == ends[0] + 6 * spacing);
+				CHECK(measuredSpaced[0] == cur[0]);
+				RichState_Free(&rich);
+			}
+			gTextLetterSpacing = 0;
+		}
+		{
+			char wrapped[80];
+			RichState_t rich = {0};
+			RichChar_t* letter;
+			int32_t cur[2] = {0}, lines;
+			Rect_t narrow = {0, 0, ends[0] + 20, 199};
+			int index = 0, wordY = -1;
+			snprintf(wrapped, sizeof wrapped, "aaa %s", samples[encoding]);
+			CHECK(Text_LayoutCoreH(&rich, &lines, wrapped, 0, &dict, cur, &narrow,
+				24, font, 0, 0, 0xffffff, style) == 1);
+			for(letter = rich.head; letter; letter = letter->next, index++)
+				if(index >= 4)
+				{
+					if(wordY < 0)
+						wordY = letter->y;
+					CHECK(letter->y == wordY);
+				}
+			CHECK(wordY == 24);
+			RichState_Free(&rich);
+		}
+	}
+	gTextUtf8 = 0;
+	OS_SetTextEncoding(0);
+	BmpMgr_Delete(mgr);
+}
+
 int main(void)
 {
 	OS_Init();
@@ -553,6 +637,7 @@ int main(void)
 	TestRuby();
 	TestMarkup();
 	TestLayoutExtensions();
+	TestCyrillicSpacing();
 	OS_Shutdown();
 	if(gFails)
 	{

@@ -53,6 +53,47 @@ Optional at run time, not linked:
 
 ## Targets
 
+The Windows game picker opens automatically when the current directory
+contains neither `system.arc` nor `ipl._bp` and no boot path is supplied.
+`--launcher` opens it explicitly, including from a game directory.
+
+For translations that patch the original executable's font creation,
+`OPENBGI_FONT_FACE` overrides the rasterised font face and
+`OPENBGI_FONT_SIZE` its pixel height (4..200). The script's layout size
+and line spacing still apply. On Windows, `OPENBGI_FONT_WEIGHT` overrides
+the GDI weight (1..1000, with 400 for regular). Set these environment
+variables before launching OpenBGI. Font height is scaled for the engine's
+antialiasing internally.
+`OPENBGI_FONT_WIDTH` overrides the rasterised average character width in
+pixels (0..200). Zero asks the platform for the font's natural proportions.
+
+The equivalent launch options are `--font-face="Segoe UI"`,
+`--font-size=24`, `--font-width=0` and `--font-weight=400`.
+They take precedence over the corresponding environment variables.
+`--font-file=FILE.ttf` loads a translation font on Windows or Android
+before the game creates its fonts. On Windows, use its internal family
+name with `--font-face`; this can differ from the filename.
+On Android, paths are relative to the selected game folder and the loaded
+file is selected directly, taking priority over UIF and family overrides.
+Font weight overrides are supported on Windows and Android. With width
+zero, horizontal Cyrillic and ASCII use the font's natural advances.
+
+For example, a Windows launch script for a translation can use:
+
+```bat
+start "" "OpenBGI.exe" --engine=1.66 --font-face="Segoe UI" --font-size=24 --font-width=0 --font-weight=400 --letter-spacing=2
+```
+
+Horizontal letter spacing can be adjusted with `--letter-spacing=N`
+or a `"letter_spacing": N` member in `OBAConfig.json` in the game
+directory. Values are integer pixels from -16 to 64, added to the advance
+of each character, including spaces. Zero is the default, positive values
+spread text out, and negative values tighten it. The command-line option
+takes precedence over the file. The resulting advance is at least one
+pixel when an adjustment is active. Measurement and word wrapping use the
+same adjustment. The setting applies to horizontal text, including the
+bidirectional layout, and leaves vertical text and ruby readings alone.
+
 | target | what it builds or does |
 |--------|------------------------|
 | `make` | the Linux engine, `bin/bgi` |

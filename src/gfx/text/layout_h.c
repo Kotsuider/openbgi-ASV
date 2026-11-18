@@ -151,7 +151,7 @@ int Text_LayoutCoreH(RichState_t* rich, int32_t* outLines, const char* str, int 
 		const char* nextPtr;
 		const FontInfo_t* cf;
 		uint32_t code;
-		int len, dbcs, width, gap, extra, advanceX, nextPos, closingFollows = 0, limit, skipChars = 0, cw;
+		int len, dbcs, glyphProportional, width, gap, extra, step, advanceX, nextPos, closingFollows = 0, limit, skipChars = 0, cw;
 		uint8_t c = (uint8_t)*p;
 
 		if(c < 0x20)
@@ -193,7 +193,8 @@ int Text_LayoutCoreH(RichState_t* rich, int32_t* outLines, const char* str, int 
 		cw = FontInfo_GlyphW(cf);
 		len = TextGetChar(&code, p);
 		dbcs = TextIsWide(code, len);
-		if((m.on || gTextWordWrap) && hang)
+		glyphProportional = Text_GlyphProportional(code, proportional) || Text_NaturalSpacing(code);
+		if((m.on || gTextWordWrap || Text_GlyphProportional(code, 0)) && hang)
 		{
 			// a space that would end the line is dropped with a line break
 			// instead, unless the one before it was a space too
@@ -221,7 +222,14 @@ int Text_LayoutCoreH(RichState_t* rich, int32_t* outLines, const char* str, int 
 			Rect_t r = {0, size - 1, view.w - 1, size - 1};
 			Bmp_Fill(&view, &r, m.colour | 0xff000000u);
 		}
-		if(proportional)
+		if(Text_NaturalSpacing(code))
+		{
+			width = FontRaster_Advance(cf->font, (int)code);
+			if(width <= 0)
+				width = g.right + 1;
+			gap = 0;
+		}
+		else if(glyphProportional)
 		{
 			Bmp_CropGlyph(&view, &g);
 			gap = Font_GapFor2(&g, cw);
@@ -236,23 +244,27 @@ int Text_LayoutCoreH(RichState_t* rich, int32_t* outLines, const char* str, int 
 		extra = 0;
 		if(m.on)
 			extra = cf->italic ? (width >> 1) + cf->font->extraW[1] : cf->font->extraW[0];
-		Layout_GlyphBitmap(&node->glyph, width + extra + sdxOn, size + sdyOn, &view, &g, (int)code, cf->font, style, sdx,
+		Layout_GlyphBitmap(&node->glyph,
+			(Text_NaturalSpacing(code) && g.right >= width ? g.right + 1 : width) + extra + sdxOn,
+			size + sdyOn, &view, &g, (int)code, cf->font, style, sdx,
 			sdy, 0);
 
 		// how far the cursor moves; a word, the ruby word and trailing
 		// punctuation may widen it
-		advanceX = width + gap - (gap >> 1) + Layout_Pitch(proportional, cf);
+		step = Text_SpacedAdvance(width + gap + Layout_Pitch(glyphProportional, cf));
+		advanceX = step - (gap >> 1);
 		nextPos = pos + len;
 		nextPtr = str + nextPos;
-		if(m.on || gTextWordWrap)
+		if(m.on || gTextWordWrap || Text_GlyphProportional(code, 0))
 		{
 			/* the word that starts here; `chars` is its length in characters.
 			 * The original's runs are single-byte text, where that is the
 			 * byte count n; the runs of the "EF 03" word wrap for the older
 			 * generations may hold multi-byte letters. */
-			int n = m.on ? Markup_WordRun(wordRun, p) : Text_WrapWordRun(wordRun, p);
+			int cyrillic = Text_GlyphProportional(code, 0);
+			int n = m.on && !cyrillic ? Markup_WordRun(wordRun, p) : Text_WrapWordRun(wordRun, p);
 			int chars = n;
-			if(!m.on)
+			if(!m.on || cyrillic)
 			{
 				int k;
 				for(chars = 0, k = 0; k < n; chars++)
@@ -262,7 +274,7 @@ int Text_LayoutCoreH(RichState_t* rich, int32_t* outLines, const char* str, int 
 				lineStart = 0;
 			else if(wordSkip > 0)
 				wordSkip--;
-			else if(!lineStart && chars >= 2)
+			else if((!lineStart || (cyrillic && cur[0] > area->l + lineStartOffset)) && chars >= 2)
 			{
 				// a Latin word is kept together: it needs its whole width
 				// now (not at the start of a line, where it cannot move)
@@ -349,7 +361,7 @@ int Text_LayoutCoreH(RichState_t* rich, int32_t* outLines, const char* str, int 
 		}
 		node->x = cur[0] + (gap >> 1);
 		node->y = cur[1] + rubySize; // the reading's room is above the glyph
-		cur[0] += width + gap + Layout_Pitch(proportional, cf);
+		cur[0] += step;
 		*link = node;
 		link = &node->next;
 		m.delay += gRubyCharDelay;

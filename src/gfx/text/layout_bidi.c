@@ -136,6 +136,8 @@ static void BuildGlyph(BidiCtx_t* x, BidiChar_t* ch, int delay)
 		ch->dx = 0;
 		ch->advance = width + Layout_Pitch(0, x->fi);
 	}
+	if(!ch->mark)
+		ch->advance = Text_SpacedAdvance(ch->advance);
 	ch->inkL = ch->dx;
 	ch->inkR = ch->dx + (g.right - g.left);
 	Layout_GlyphBitmap(&ch->node->glyph, width + x->sdxOn, x->size + x->sdyOn, &view, &g, (int)ch->code, x->fi->font,
