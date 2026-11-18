@@ -133,6 +133,7 @@ int Text_SetScaleDivisor(int32_t v); // "91 99" (1.529 on): 1 ok, 0 bad
 extern int32_t gTextLastPos[2];
 extern uint32_t gTextLastColour;
 extern int32_t gCharPitch;    // extra pixels per non-proportional character
+extern int32_t gTextLetterSpacing; // extra pixels per horizontal character, supplied by the launcher
 extern int32_t gHangBrackets; // hang a leading bracket into the margin
 extern int32_t gTextIndent;   // line-start indent when ruby is on (the margin "91 98" leaves for readings), pixels
 

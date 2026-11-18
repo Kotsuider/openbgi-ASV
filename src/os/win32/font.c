@@ -237,8 +237,17 @@ OsFont_t* OS_FontOpen(const char* face, int height, int width, int bold, int ita
 {
 	WCHAR wface[0x100];
 	HFONT font;
+	int weight = bold ? FW_BOLD : FW_THIN;
+	const char* overrideWeight = getenv("OPENBGI_FONT_WEIGHT");
+	if(overrideWeight && *overrideWeight)
+	{
+		char* end;
+		long value = strtol(overrideWeight, &end, 10);
+		if(!*end && value >= 1 && value <= 1000)
+			weight = (int)value;
+	}
 	Win32_ToWide(face, wface, (int)BGI_COUNTOF(wface));
-	font = CreateFontW(height, width, 0, 0, bold ? FW_BOLD : FW_THIN, italic ? 1 : 0, 0, 0, SHIFTJIS_CHARSET,
+	font = CreateFontW(height, width, 0, 0, weight, italic ? 1 : 0, 0, 0, SHIFTJIS_CHARSET,
 		OUT_TT_PRECIS, 0, PROOF_QUALITY, FIXED_PITCH, wface);
 	return FontNew(font, 8);
 }

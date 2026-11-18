@@ -59,6 +59,7 @@ int32_t gRubyCharDelay = 25; // the rich output's defaults until "91 98" sets th
 int32_t gRubyFadeSteps = 30;
 int32_t gRubySizePct = 40;
 int32_t gCharPitch;
+int32_t gTextLetterSpacing;
 int32_t gHangBrackets;
 int32_t gTextIndent;
 

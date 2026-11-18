@@ -120,6 +120,28 @@ static void FontRaster_AllocCells(FontRaster_t* f, int size, int capacity)
  * aligned).  1 ok, 0 when the OS refuses the font. */
 static int FontRaster_CreateFont(FontRaster_t* f, const char* face, int size, int widthPct, int bold, int italic)
 {
+	const char* overrideFace = getenv("OPENBGI_FONT_FACE");
+	const char* overrideSize = getenv("OPENBGI_FONT_SIZE");
+	const char* overrideWidth = getenv("OPENBGI_FONT_WIDTH");
+	int renderSize = size;
+	int renderWidth;
+	if(overrideFace && *overrideFace)
+		face = overrideFace;
+	if(overrideSize && *overrideSize)
+	{
+		char* end;
+		long value = strtol(overrideSize, &end, 10);
+		if(!*end && value >= 4 && value <= 200)
+			renderSize = (int)value;
+	}
+	renderWidth = (gAaScale * renderSize * widthPct) / 200;
+	if(overrideWidth && *overrideWidth)
+	{
+		char* end;
+		long value = strtol(overrideWidth, &end, 10);
+		if(!*end && value >= 0 && value <= 200)
+			renderWidth = gAaScale * (int)value;
+	}
 	f->glyphW = (size * widthPct) / 100;
 	// an italic font gets a DIB a quarter wider for the shear
 	f->renderW = italic ? (size * widthPct * 5) / 400 : f->glyphW;
@@ -127,7 +149,7 @@ static int FontRaster_CreateFont(FontRaster_t* f, const char* face, int size, in
 		f->renderW = f->cellW;
 	f->ssH = gAaScale * size;
 	f->ssW = f->renderW * gAaScale;
-	f->os = OS_FontOpen(face, f->ssH, (gAaScale * size * widthPct) / 200, bold, italic);
+	f->os = OS_FontOpen(face, gAaScale * renderSize, renderWidth, bold, italic);
 	if(!f->os)
 		return 0;
 	f->ssPitch = (f->ssW + 3) & ~3; // DIB rows are dword aligned

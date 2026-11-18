@@ -80,6 +80,10 @@ requirements when distributing an APK.
 
 ## Translation patches
 
+See [translation patch methods](../README.md#translation-patch-methods)
+for the UIF/H2O, modified-EXE/Itsusora and font-proxy/Eustia examples,
+including the Windows launch commands and platform-specific support.
+
 Place the translation's `patch` directory, JSON configuration and any
 configured fonts in the selected game folder. The application checks
 `uif_config.json` first and falls back to `config.json`, both UTF-8. No Windows
@@ -121,3 +125,40 @@ The launch settings allow a saved per-game command-line override. With
 Use arguments from game config enabled, the launcher uses the JSON
 arguments each time. Extra arguments go to OpenBGI's command-line parser
 after the selected profile. Set `--productname` here if the game needs it.
+
+## Russian text and font settings
+
+Horizontal Cyrillic text supports CP932 (Shift-JIS) and the engine's
+UTF-8 mode. Cyrillic words are kept together when they fit on a line.
+UTF-8 scripts must enable the appropriate text encoding in the engine.
+
+Enter font options in the game's **Arguments** field, or in the
+`arguments` string of `OBAConfig.json`. For example:
+
+```text
+--font-size=24 --font-width=0 --letter-spacing=2
+```
+
+- `--letter-spacing=N` adds integer pixels to each horizontal character's
+  advance, including spaces. The range is -16..64, and the default is 0.
+  Positive values spread letters out. Negative values tighten them.
+  Measurement and wrapping use the same adjustment.
+- `--font-size=N` sets the rasterised font height (4..200 pixels). The
+  script still controls the text area's layout size and line spacing.
+- `--font-width=N` sets the average rasterised character width
+  (0..200 pixels). Zero uses the font's natural proportions and advances
+  for Cyrillic, Latin and ASCII punctuation and spaces.
+- `--font-weight=N` sets the font weight (1..1000). Regular is 400,
+  and bold is 700. Availability of individual weights depends on the font.
+- `--font-file=FILE.ttf` loads a font directly from the selected game
+  folder. Subfolders are supported. The loaded file takes priority over
+  a UIF font and `--font-face`.
+- `--font-face="sans-serif"` selects an Android system font family when
+  no file override is loaded. Windows fonts such as Segoe UI can be
+  supplied as a font file through `--font-file`.
+
+An optional top-level `"letter_spacing": 2` in `OBAConfig.json` supplies
+the spacing when the arguments do not contain `--letter-spacing`.
+Explicit arguments take precedence. Letter spacing affects horizontal
+text, including bidirectional text. Vertical text and ruby readings use
+their existing spacing.

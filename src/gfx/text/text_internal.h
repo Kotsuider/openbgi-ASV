@@ -24,4 +24,11 @@
 #include "bgi/version.h"
 #include "bgi/msg.h"
 
+/* Cyrillic in CP932 occupies two bytes, but its ink should use
+ * proportional spacing in horizontal translated text. UTF-8 uses Unicode
+ * code points instead of packed CP932 codes. */
+int Text_GlyphProportional(uint32_t code, int proportional);
+int Text_NaturalSpacing(uint32_t code);
+int Text_SpacedAdvance(int advance);
+
 #endif

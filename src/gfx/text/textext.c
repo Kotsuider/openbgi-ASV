@@ -109,6 +109,8 @@ const Bmp_t* Text_ArrowBitmap(int which, int size, uint32_t colour, Bmp_t* tmp)
 // 1 for a character lines may break next to without a space: the full-width (CJK) characters
 static int BreaksAnywhere(uint32_t code, int len)
 {
+	if(Text_GlyphProportional(code, 0))
+		return 0;
 	if(!gTextUtf8)
 		return len > 1 || code >= 0x80; // double-byte characters and the half-width katakana
 	return (code >= 0x2e80 && code <= 0xd7ff) || (code >= 0xf900 && code <= 0xfaff) || (code >= 0xfe30 && code <= 0xfe4f) ||

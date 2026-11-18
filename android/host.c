@@ -168,10 +168,30 @@ void WasmJs_FillBlack(void)
 	(*env)->CallVoidMethod(env, activity, METHOD("fillBlack", "()V"));
 }
 
+int WasmJs_FontAddFile(const char* path)
+{
+	jstring name = (*env)->NewStringUTF(env, path);
+	if(!name)
+		return 0;
+	int loaded = (*env)->CallBooleanMethod(env, activity, METHOD("fontAddFile", "(Ljava/lang/String;)Z"), name);
+	(*env)->DeleteLocalRef(env, name);
+	return loaded;
+}
+
 int WasmJs_FontOpen(const char* face, int height, int width, int bold, int italic)
 {
 	(void)face;
-	return (*env)->CallIntMethod(env, activity, METHOD("fontOpen", "(IIII)I"), height, width, bold, italic);
+	const char* override = getenv("OPENBGI_FONT_FACE");
+	const char* weightText = getenv("OPENBGI_FONT_WEIGHT");
+	int weight = weightText ? atoi(weightText) : (bold ? 700 : 400);
+	if(weight < 1 || weight > 1000)
+		weight = bold ? 700 : 400;
+	jstring family = override && *override ? (*env)->NewStringUTF(env, override) : NULL;
+	int id = (*env)->CallIntMethod(env, activity, METHOD("fontOpen", "(Ljava/lang/String;IIII)I"),
+		family, height, width, weight, italic);
+	if(family)
+		(*env)->DeleteLocalRef(env, family);
+	return id;
 }
 
 int WasmJs_FontAdvance(int id, int cp)

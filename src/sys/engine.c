@@ -32,6 +32,8 @@
 #include "bgi/error.h"
 #include "bgi/msg.h"
 #include "bgi/os.h"
+#include "bgi/json.h"
+#include "bgi/gfx/text.h"
 
 int gLauncherMode;                       // "Execute as a launcher.": no sound, no saved window position
 int gNoMutex;                            // "Do not use mutex.": several instances may run
@@ -330,6 +332,18 @@ static char gOptEntry[0x104];   // --entry=
 static char gOptOut[0x200];     // --out=
 static int gOptExtractMode;     // EXTRACT_DECODE / RAW / CONVERT
 static int gOptDebug;           // --debug: 1 open the debugger, 2 open it paused
+static int gOptLetterSpacing;
+static char gOptFontFile[0x400];
+static int gOptLauncher;       // --launcher: show the game picker even inside a game folder
+
+static void Engine_FontOption(const char* name, const char* value)
+{
+#if defined(BGI_WIN32)
+	_putenv_s(name, value);
+#else
+	setenv(name, value, 1);
+#endif
+}
 
 /* Take the "--" options out of the command line (they are blanked in
  * place) into the gOpt* variables; an unknown option is reported on
@@ -366,10 +380,44 @@ static void Engine_ParseOptions(char* cmd)
 			continue;
 		if(strncmp(opt, "--engine=", 9) == 0)
 			snprintf(gOptEngine, sizeof gOptEngine, "%s", opt + 9);
+		else if(strcmp(opt, "--launcher") == 0)
+			gOptLauncher = 1;
 		else if(strncmp(opt, "--productname=", 14) == 0)
 			snprintf(gOptProduct, sizeof gOptProduct, "%s", opt + 14);
 		else if(strncmp(opt, "--games=", 8) == 0)
 			snprintf(gOptGames, sizeof gOptGames, "%s", opt + 8);
+		else if(strncmp(opt, "--letter-spacing=", 17) == 0)
+		{
+			char* end;
+			long value = strtol(opt + 17, &end, 10);
+			if(end != opt + 17 && !*end && value >= -16 && value <= 64)
+			{
+				gTextLetterSpacing = (int)value;
+				gOptLetterSpacing = 1;
+			}
+			else
+				fprintf(stderr, "bgi: invalid letter spacing (expected integer -16..64)\n");
+		}
+		else if(strncmp(opt, "--font-face=", 12) == 0)
+			Engine_FontOption("OPENBGI_FONT_FACE", opt + 12);
+		else if(strncmp(opt, "--font-file=", 12) == 0)
+			snprintf(gOptFontFile, sizeof gOptFontFile, "%s", opt + 12);
+		else if(strncmp(opt, "--font-size=", 12) == 0 ||
+			strncmp(opt, "--font-width=", 13) == 0 || strncmp(opt, "--font-weight=", 14) == 0)
+		{
+			int width = strncmp(opt, "--font-width=", 13) == 0;
+			int weight = strncmp(opt, "--font-weight=", 14) == 0;
+			const char* value = opt + (width ? 13 : weight ? 14 : 12);
+			char* end;
+			long number = strtol(value, &end, 10);
+			int min = width ? 0 : weight ? 1 : 4;
+			int max = weight ? 1000 : 200;
+			if(end != value && !*end && number >= min && number <= max)
+				Engine_FontOption(width ? "OPENBGI_FONT_WIDTH" :
+					weight ? "OPENBGI_FONT_WEIGHT" : "OPENBGI_FONT_SIZE", value);
+			else
+				fprintf(stderr, "bgi: invalid font option %s (expected integer %d..%d)\n", opt, min, max);
+		}
 		else if(strncmp(opt, "--enable=", 9) == 0 || strncmp(opt, "--disable=", 10) == 0)
 		{
 			int enable = opt[2] == 'e';
@@ -411,6 +459,51 @@ static void Engine_ParseOptions(char* cmd)
 }
 
 static char gGamesPath[0x408]; // the games.json in use (Engine_LoadGames)
+
+/* Per-game horizontal tracking. Explicit command-line options win. */
+static void Engine_LoadTextConfig(void)
+{
+	char path[0x408];
+	OsFile_t* file;
+	uint32_t length;
+	char* data;
+	JsonNode_t* root;
+	const JsonNode_t* spacing;
+	if(gOptLetterSpacing)
+		return;
+	OS_GameDir(path, sizeof path);
+	strncat(path, "OBAConfig.json", sizeof path - strlen(path) - 1);
+	file = OS_FileOpenRead(path);
+	if(!file)
+		return;
+	length = OS_FileSize(file);
+	if(length > 1024 * 1024)
+	{
+		OS_FileClose(file);
+		return;
+	}
+	data = (char*)BGI_Alloc((size_t)length + 1);
+	if(OS_FileRead(file, data, length) != length)
+	{
+		OS_FileClose(file);
+		BGI_Free(data);
+		return;
+	}
+	OS_FileClose(file);
+	data[length] = 0;
+	root = Json_Parse(data, length, NULL);
+	BGI_Free(data);
+	spacing = Json_Get(root, "letter_spacing");
+	if(spacing && spacing->type == JSON_NUMBER)
+	{
+		double value = spacing->num;
+		if(value >= -16 && value <= 64 && value == (int)value)
+			gTextLetterSpacing = (int)value;
+		else
+			fprintf(stderr, "bgi: invalid letter_spacing in OBAConfig.json (expected integer -16..64)\n");
+	}
+	Json_Free(root);
+}
 
 const char* Engine_GamesJsonPath(void)
 {
@@ -503,7 +596,7 @@ static int Engine_ChooseGame(void)
 {
 	char profile[32], options[OS_LAUNCHER_OPTIONS_MAX];
 	int r;
-	if(!gBootDefault || OS_FileAttrs("system.arc") != OS_INVALID_ATTRS || OS_FileAttrs("ipl._bp") != OS_INVALID_ATTRS)
+	if(!gOptLauncher && (!gBootDefault || OS_FileAttrs("system.arc") != OS_INVALID_ATTRS || OS_FileAttrs("ipl._bp") != OS_INVALID_ATTRS))
 		return 1;
 	r = Launcher_Run(gGamesPath, profile, sizeof profile, options, sizeof options);
 	if(r < 0)
@@ -584,6 +677,11 @@ int Engine_Main(const char* cmdLine)
 		if(r <= 0)
 			return r < 0 ? 1 : 0;
 	}
+	Engine_LoadTextConfig();
+	if(gOptFontFile[0] && !OS_FontAddFile(gOptFontFile))
+		fprintf(stderr, "bgi: cannot load font file %s\n", gOptFontFile);
+	if(gTextLetterSpacing)
+		fprintf(stderr, "bgi: letter spacing %+d px\n", (int)gTextLetterSpacing);
 	if(!gNoMutex)
 	{
 		mutex = OS_InstanceMutexCreate("Buriko General Interpreter for Tayutama is executing.", &exists);
