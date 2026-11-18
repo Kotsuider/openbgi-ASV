@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="add">添加游戏文件夹</string>
+    <string name="settings">设置</string>
+    <string name="language">语言</string>
+    <string name="folders">文件夹</string>
+    <string name="library">游戏库</string>
+    <string name="logs">日志</string>
+    <string name="empty">请添加包含 OpenBGI 游戏的文件夹。</string>
+    <string name="game_settings">游戏设置</string>
+    <string name="detected_profile">使用检测到的配置</string>
+    <string name="use_config">使用游戏配置中的参数</string>
+    <string name="arguments">命令行参数</string>
+    <string name="choose_cover">选择封面</string>
+    <string name="change_cover">更换封面</string>
+    <string name="use_preview">使用游戏预览图</string>
+    <string name="remove_game">从游戏库移除</string>
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
+    <string name="remove_title">要从游戏库移除吗？</string>
+    <string name="remove_message">要从游戏库移除 %1$s 吗？游戏文件和存档会保留。</string>
+    <string name="remove">移除</string>
+    <string name="no_log">启动游戏后即可查看日志。</string>
+    <string name="last_launch">上次启动</string>
+    <string name="refresh">刷新</string>
+    <string name="loading">加载中…</string>
+    <string name="config_detected">已检测到游戏配置</string>
+    <string name="launch">启动</string>
+    <string name="version_unknown">找不到 BGI 版本。请添加游戏的原始 EXE，或手动选择配置。</string>
+    <string name="profile_unknown">没有完全匹配的配置。建议使用 %1$s</string>
+    <string name="log_tail">显示最后 64 KiB。</string>
+    <string name="log_error">无法读取日志。请点击刷新。</string>
+    <string name="cover_error">无法保留对所选图片的访问权限。</string>
+    <string name="folder_invalid">请选择包含 system.arc 或 ipl._bp 的游戏文件夹。</string>
+    <string name="folder_permission">Android 未授予该文件夹的持久访问权限。</string>
+    <string name="game_unreadable">无法读取此游戏。请重新添加其文件夹。</string>
+    <string name="choose_profile">选择配置</string>
+    <string name="no_matching_profile">未找到匹配的配置，请手动选择。</string>
+</resources>

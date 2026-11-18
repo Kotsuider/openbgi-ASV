@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="add">Добавить папку игры</string>
+    <string name="settings">Настройки</string>
+    <string name="language">Язык</string>
+    <string name="folders">Папки</string>
+    <string name="library">Библиотека</string>
+    <string name="logs">Журнал</string>
+    <string name="empty">Добавьте папку с игрой для OpenBGI.</string>
+    <string name="game_settings">Настройки игры</string>
+    <string name="detected_profile">Использовать найденный профиль</string>
+    <string name="use_config">Брать аргументы из конфига игры</string>
+    <string name="arguments">Аргументы командной строки</string>
+    <string name="choose_cover">Выбрать обложку</string>
+    <string name="change_cover">Сменить обложку</string>
+    <string name="use_preview">Использовать превью игры</string>
+    <string name="remove_game">Убрать из библиотеки</string>
+    <string name="save">Сохранить</string>
+    <string name="cancel">Отмена</string>
+    <string name="remove_title">Убрать из библиотеки?</string>
+    <string name="remove_message">Убрать «%1$s» из библиотеки? Файлы игры и сохранения останутся на месте.</string>
+    <string name="remove">Убрать</string>
+    <string name="no_log">Запустите игру, чтобы увидеть её журнал.</string>
+    <string name="last_launch">Последний запуск</string>
+    <string name="refresh">Обновить</string>
+    <string name="loading">Загрузка…</string>
+    <string name="config_detected">Найден конфиг игры</string>
+    <string name="launch">Запустить</string>
+    <string name="version_unknown">Версия BGI не найдена. Добавьте оригинальный EXE игры или выберите профиль вручную.</string>
+    <string name="profile_unknown">Точного профиля нет. Предлагается %1$s</string>
+    <string name="log_tail">Показаны последние 64 КиБ.</string>
+    <string name="log_error">Не удалось прочитать журнал. Нажмите «Обновить».</string>
+    <string name="cover_error">Не удалось сохранить доступ к выбранному изображению.</string>
+    <string name="folder_invalid">Выберите папку игры, в которой есть system.arc или ipl._bp.</string>
+    <string name="folder_permission">Android не предоставил постоянный доступ к папке.</string>
+    <string name="game_unreadable">Не удалось прочитать файлы игры. Добавьте папку заново, чтобы восстановить доступ.</string>
+    <string name="choose_profile">Выбрать профиль</string>
+    <string name="no_matching_profile">Подходящий профиль не найден. Выберите его вручную.</string>
+</resources>

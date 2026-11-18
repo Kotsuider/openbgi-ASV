@@ -346,7 +346,7 @@ static void PtclAnimResult(Thread_t* t, uint32_t r, int type, int pattern, int f
 	}
 }
 
-static int Opcode_Ext1_PtclAnimation(Thread_t* t) // C0 18 (1.494 on): type, pattern, count, firstBmp, a, b, frames →
+static int Opcode_Ext1_PtclAnimation(Thread_t* t) // C0 18 (1.69 build 472 on): type, pattern, count, firstBmp, a, b, frames →
 {
 	int32_t frames = (int32_t)Thread_Pop(t), b = (int32_t)Thread_Pop(t), a = (int32_t)Thread_Pop(t);
 	int firstBmp = (int)Thread_Pop(t), count = (int)Thread_Pop(t);
@@ -709,7 +709,7 @@ void Vm_OptableC0Init(void)
 		{0x0F, Opcode_Ext1_PtclClear, GEN_FIRST, GEN_LAST},
 		{0x10, Opcode_Ext1_PtclSetWind, GEN_FIRST, GEN_LAST},
 		{0x20, Opcode_Ext1_PtclGroupA, GEN_FIRST, GEN_LAST},
-		{0x18, Opcode_Ext1_PtclAnimation, GEN_1_494, GEN_LAST},
+		{0x18, Opcode_Ext1_PtclAnimation, GEN_1_69_472, GEN_LAST},
 		{0x1A, Opcode_Ext1_PtclAltAnimation, GEN_1_636, GEN_LAST},
 		{0x1B, Opcode_Ext1_PtclAltLevel, GEN_1_636, GEN_LAST},
 		{0x1F, Opcode_Ext1_PtclAnimMode, GEN_1_494, GEN_LAST},

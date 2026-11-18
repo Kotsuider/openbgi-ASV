@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="add">Ajouter un dossier de jeu</string>
+    <string name="settings">Paramètres</string>
+    <string name="language">Langue</string>
+    <string name="folders">Dossiers</string>
+    <string name="library">Bibliothèque</string>
+    <string name="logs">Journaux</string>
+    <string name="empty">Ajoutez un dossier contenant un jeu OpenBGI.</string>
+    <string name="game_settings">Paramètres du jeu</string>
+    <string name="detected_profile">Utiliser le profil détecté</string>
+    <string name="use_config">Utiliser les arguments de la configuration du jeu</string>
+    <string name="arguments">Arguments de la ligne de commande</string>
+    <string name="choose_cover">Choisir une couverture</string>
+    <string name="change_cover">Changer la couverture</string>
+    <string name="use_preview">Utiliser l’aperçu du jeu</string>
+    <string name="remove_game">Retirer de la bibliothèque</string>
+    <string name="save">Enregistrer</string>
+    <string name="cancel">Annuler</string>
+    <string name="remove_title">Retirer de la bibliothèque ?</string>
+    <string name="remove_message">Retirer %1$s de la bibliothèque ? Les fichiers et les sauvegardes seront conservés.</string>
+    <string name="remove">Retirer</string>
+    <string name="no_log">Lancez un jeu pour afficher son journal.</string>
+    <string name="last_launch">Dernier lancement</string>
+    <string name="refresh">Actualiser</string>
+    <string name="loading">Chargement…</string>
+    <string name="config_detected">Configuration du jeu détectée</string>
+    <string name="launch">Lancer</string>
+    <string name="version_unknown">Version BGI introuvable. Ajoutez le fichier EXE original du jeu ou sélectionnez un profil manuellement.</string>
+    <string name="profile_unknown">Aucun profil exact. Profil suggéré : %1$s</string>
+    <string name="log_tail">Affichage des 64 derniers Kio.</string>
+    <string name="log_error">Impossible de lire le journal. Appuyez sur Actualiser.</string>
+    <string name="cover_error">Impossible de conserver l’accès à l’image sélectionnée.</string>
+    <string name="folder_invalid">Choisissez le dossier du jeu contenant system.arc ou ipl._bp.</string>
+    <string name="folder_permission">Android n’a pas accordé d’accès permanent à ce dossier.</string>
+    <string name="game_unreadable">Impossible de lire le jeu. Ajoutez à nouveau son dossier.</string>
+    <string name="choose_profile">Choisir un profil</string>
+    <string name="no_matching_profile">Aucun profil compatible trouvé. Sélectionnez-en un manuellement.</string>
+</resources>

@@ -9,3 +9,14 @@ BGIError.txt
 internal/
 __pycache__/
 *.pyc
+
+# Android Gradle outputs
+/android/.gradle/
+/android/.kotlin/
+/android/build/
+/android/local.properties
+
+# Private Android signing material
+*.keystore
+*.jks
+*.p12

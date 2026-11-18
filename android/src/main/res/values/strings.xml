@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="add">Add game folder</string>
+    <string name="settings">Settings</string>
+    <string name="language">Language</string>
+    <string name="folders">Folders</string>
+    <string name="library">Library</string>
+    <string name="logs">Logs</string>
+    <string name="empty">Add a folder containing an OpenBGI game.</string>
+    <string name="game_settings">Game settings</string>
+    <string name="detected_profile">Use detected profile</string>
+    <string name="use_config">Use arguments from game config</string>
+    <string name="arguments">Command-line arguments</string>
+    <string name="choose_cover">Choose cover</string>
+    <string name="change_cover">Change cover</string>
+    <string name="use_preview">Use game preview</string>
+    <string name="remove_game">Remove from library</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="remove_title">Remove from library?</string>
+    <string name="remove_message">Remove %1$s from the library? Game files and saves will be kept.</string>
+    <string name="remove">Remove</string>
+    <string name="no_log">Launch a game to see its log here.</string>
+    <string name="last_launch">Last launch</string>
+    <string name="refresh">Refresh</string>
+    <string name="loading">Loading…</string>
+    <string name="config_detected">Game config detected</string>
+    <string name="launch">Launch</string>
+    <string name="version_unknown">BGI version not found. Add the original game EXE or select a profile manually.</string>
+    <string name="profile_unknown">No exact profile. Suggested: %1$s</string>
+    <string name="log_tail">Showing the last 64 KiB.</string>
+    <string name="log_error">Could not read the log. Tap Refresh to retry.</string>
+    <string name="cover_error">Could not retain access to the selected image.</string>
+    <string name="folder_invalid">Choose the game folder containing system.arc or ipl._bp.</string>
+    <string name="folder_permission">Android did not grant persistent access to that folder.</string>
+    <string name="game_unreadable">Cannot read this game. Add its folder again to restore access.</string>
+    <string name="choose_profile">Select profile</string>
+    <string name="no_matching_profile">No matching profile. Select one manually.</string>
+</resources>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="add">ゲームフォルダーを追加</string>
+    <string name="settings">設定</string>
+    <string name="language">言語</string>
+    <string name="folders">フォルダー</string>
+    <string name="library">ライブラリ</string>
+    <string name="logs">ログ</string>
+    <string name="empty">OpenBGI ゲームのフォルダーを追加してください。</string>
+    <string name="game_settings">ゲーム設定</string>
+    <string name="detected_profile">検出したプロファイルを使用</string>
+    <string name="use_config">ゲーム設定の引数を使用</string>
+    <string name="arguments">コマンドライン引数</string>
+    <string name="choose_cover">カバーを選択</string>
+    <string name="change_cover">カバーを変更</string>
+    <string name="use_preview">ゲームのプレビューを使用</string>
+    <string name="remove_game">ライブラリから削除</string>
+    <string name="save">保存</string>
+    <string name="cancel">キャンセル</string>
+    <string name="remove_title">ライブラリから削除しますか？</string>
+    <string name="remove_message">%1$s をライブラリから削除しますか？ゲームファイルとセーブデータは保持されます。</string>
+    <string name="remove">削除</string>
+    <string name="no_log">ゲームを起動するとログが表示されます。</string>
+    <string name="last_launch">前回の起動</string>
+    <string name="refresh">更新</string>
+    <string name="loading">読み込み中…</string>
+    <string name="config_detected">ゲーム設定を検出しました</string>
+    <string name="launch">起動</string>
+    <string name="version_unknown">BGI のバージョンが見つかりません。ゲームの元の EXE を追加するか、プロファイルを手動で選択してください。</string>
+    <string name="profile_unknown">一致するプロファイルがありません。推奨: %1$s</string>
+    <string name="log_tail">末尾の 64 KiB を表示しています。</string>
+    <string name="log_error">ログを読み込めませんでした。「更新」をタップしてください。</string>
+    <string name="cover_error">選択した画像へのアクセスを保持できませんでした。</string>
+    <string name="folder_invalid">system.arc または ipl._bp が含まれるゲームフォルダーを選択してください。</string>
+    <string name="folder_permission">Android がこのフォルダーへの継続的なアクセスを許可しませんでした。</string>
+    <string name="game_unreadable">ゲームを読み込めません。フォルダーをもう一度追加してください。</string>
+    <string name="choose_profile">プロファイルを選択</string>
+    <string name="no_matching_profile">対応するプロファイルが見つかりません。手動で選択してください。</string>
+</resources>
