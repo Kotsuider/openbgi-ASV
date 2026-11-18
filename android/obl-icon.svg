@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192" role="img" aria-labelledby="title">
+  <title id="title">OBL monogram</title>
+  <rect width="192" height="192" rx="42" fill="#101B30"/>
+  <path fill="#F1F5FF" fill-rule="evenodd"
+        d="M96 24a72 72 0 1 0 0 144 72 72 0 0 0 0-144Zm0 14a58 58 0 1 1 0 116 58 58 0 0 1 0-116Z"/>
+  <path fill="#64D8E4" fill-rule="evenodd"
+        d="M65 55h35c16 0 27 9 27 22 0 8-4 14-11 17 10 4 15 11 15 21 0 14-11 23-29 23H65V55Zm13 12v22h20c10 0 16-4 16-11s-6-11-16-11H78Zm0 34v25h23c11 0 17-4 17-12 0-8-6-13-17-13H78Z"/>
+  <path fill="#F1F5FF" d="M88 104h6v13h13v6H88z"/>
+</svg>

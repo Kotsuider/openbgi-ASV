@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="add">Dodaj folder gry</string>
+    <string name="settings">Ustawienia</string>
+    <string name="language">Język</string>
+    <string name="folders">Foldery</string>
+    <string name="library">Biblioteka</string>
+    <string name="logs">Dziennik</string>
+    <string name="empty">Dodaj folder z grą OpenBGI.</string>
+    <string name="game_settings">Ustawienia gry</string>
+    <string name="detected_profile">Użyj wykrytego profilu</string>
+    <string name="use_config">Użyj argumentów z konfiguracji gry</string>
+    <string name="arguments">Argumenty wiersza poleceń</string>
+    <string name="choose_cover">Wybierz okładkę</string>
+    <string name="change_cover">Zmień okładkę</string>
+    <string name="use_preview">Użyj podglądu gry</string>
+    <string name="remove_game">Usuń z biblioteki</string>
+    <string name="save">Zapisz</string>
+    <string name="cancel">Anuluj</string>
+    <string name="remove_title">Usunąć z biblioteki?</string>
+    <string name="remove_message">Usunąć grę %1$s z biblioteki? Pliki gry i zapisy zostaną zachowane.</string>
+    <string name="remove">Usuń</string>
+    <string name="no_log">Uruchom grę, aby zobaczyć jej dziennik.</string>
+    <string name="last_launch">Ostatnie uruchomienie</string>
+    <string name="refresh">Odśwież</string>
+    <string name="loading">Ładowanie…</string>
+    <string name="config_detected">Wykryto konfigurację gry</string>
+    <string name="launch">Uruchom</string>
+    <string name="version_unknown">Nie znaleziono wersji BGI. Dodaj oryginalny plik EXE gry lub wybierz profil ręcznie.</string>
+    <string name="profile_unknown">Brak dokładnego profilu. Sugerowany: %1$s</string>
+    <string name="log_tail">Wyświetlono ostatnie 64 KiB.</string>
+    <string name="log_error">Nie można odczytać dziennika. Naciśnij Odśwież.</string>
+    <string name="cover_error">Nie udało się zachować dostępu do wybranego obrazu.</string>
+    <string name="folder_invalid">Wybierz folder gry zawierający system.arc lub ipl._bp.</string>
+    <string name="folder_permission">Android nie przyznał trwałego dostępu do folderu.</string>
+    <string name="game_unreadable">Nie można odczytać gry. Dodaj jej folder ponownie.</string>
+    <string name="choose_profile">Wybierz profil</string>
+    <string name="no_matching_profile">Nie znaleziono pasującego profilu. Wybierz go ręcznie.</string>
+</resources>

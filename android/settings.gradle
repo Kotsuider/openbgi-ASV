@@ -1,0 +1,40 @@
+pluginManagement {
+    repositories {
+        def googleMirror = System.getenv('OPENBGI_GOOGLE_MAVEN')
+        def centralMirror = System.getenv('OPENBGI_CENTRAL_MAVEN')
+        if (googleMirror) {
+            maven {
+                url = uri(googleMirror)
+                content {
+                    includeGroupByRegex('com\\.android(\\..*)?')
+                    includeGroupByRegex('androidx(\\..*)?')
+                    includeGroup('com.google.testing.platform')
+                }
+            }
+        } else google()
+        if (centralMirror) maven { url = uri(centralMirror) }
+        else {
+            mavenCentral()
+            gradlePluginPortal()
+        }
+    }
+}
+dependencyResolutionManagement {
+    repositories {
+        def googleMirror = System.getenv('OPENBGI_GOOGLE_MAVEN')
+        def centralMirror = System.getenv('OPENBGI_CENTRAL_MAVEN')
+        if (googleMirror) {
+            maven {
+                url = uri(googleMirror)
+                content {
+                    includeGroupByRegex('com\\.android(\\..*)?')
+                    includeGroupByRegex('androidx(\\..*)?')
+                    includeGroup('com.google.testing.platform')
+                }
+            }
+        } else google()
+        if (centralMirror) maven { url = uri(centralMirror) }
+        else mavenCentral()
+    }
+}
+rootProject.name = 'OpenBGIAndroid'

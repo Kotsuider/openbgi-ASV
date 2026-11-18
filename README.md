@@ -1,11 +1,102 @@
-# OpenBGI
+# OpenBGI for Android
+
+An Android launcher and native port of [Cytlan/OpenBGI](https://github.com/Cytlan/openbgi)
+for games built with the Ethornell/Buriko General Interpreter.
+
+**Alternative for Android:** [Enginehost Buriko plugin](https://github.com/Droidtop/enginehost-buriko-plugin)
+packages OpenBGI as an engine for [Enginehost](https://github.com/Droidtop/enginehost).
+This fork builds a standalone Android application.
+
+## Android features
+
+- **Folders, Library and Logs** with swipe navigation. Folders shows
+  each game's path and engine profile. Library shows cover cards in two
+  columns on portrait phones. The launcher remembers the folder, profile,
+  custom cover and command-line override. Removing an entry keeps the
+  game files and saves.
+- **Automatic BGI version detection** from the original game EXE. The
+  launcher shows the detected build and flags missing exact profiles.
+  For the 1.69 family it can suggest the nearest known build. If there
+  is no suggestion, select a profile manually before launching.
+- **Per-game configuration** through `OBAConfig.json`, for cover art,
+  translation configuration and extra OpenBGI arguments.
+- **Partial UIF configuration support** for loose-file redirects,
+  character substitution and a configured replacement font. Translation
+  files can be placed in `patch/` beside the archives.
+- **Touch and configurable controls.** Tap with two fingers for a right
+  click and swipe vertically for the mouse wheel. Overlay buttons can
+  send Windows keys, including hold-to-skip with Ctrl, and can be moved,
+  resized, styled or hidden.
+- **Local saves, Vorbis audio and a readable launch log.** The log records
+  the last game launch. The launcher has eleven interface languages.
+
+## Quick start
+
+1. Use an ARM64 Android device running Android 9 (API 28) or later.
+2. Copy your game files to a folder such as `Games/My Novel` in shared
+   storage. Keep the original EXE for version detection.
+3. Tap **+**, select the game folder in the system picker and grant read
+   access. Launch from **Folders** or **Library**. To edit launch options,
+   tap the profile in **Folders** or long-press the Library card.
+4. In **Game settings**, choose a profile, enter a command-line override
+   or switch back to the game's configured arguments. You can also pick a
+   cover from the gallery or restore the game's own preview.
+
+For a translated game, place the patch files, any required fonts, and
+the configuration in the same game folder. Example:
+
+```json
+{
+  "preview": "prev.bpfa",
+  "uif": "uif_config.json",
+  "arguments": "--productname=H2ORTAAACSE"
+}
+```
+
+Save this as `OBAConfig.json`. All fields are optional. A WebP preview can
+use the `.bpfa` extension. The translation settings support
+`file_monitor.actions` redirects, `character_substitution`, and
+`font_manager` resource files with font creation override. See the
+[Android guide](android/README.md) for lookup and override rules.
+
+## Compatibility and builds
+
+- **H2O after and another Complete Story Edition** was tested on Android
+  with profile `1.69/472`, Russian translation assets, audio, saving and
+  loading.
+- **Suika A.S+** reaches the title menu and starts a scene with
+  `1.69/472` and `--productname=SuikaENG`. The Android build currently
+  skips the opening movie.
+- **Subarashiki Hibi 15th Anniversary Edition** has the `1.685` runtime
+  changes from WenniDev. The VM instructions were tested, and the game
+  itself has yet to be verified on Android.
+
+See the [Android build and signing guide](android/README.md).
+Compatibility statuses in the upstream section below refer to the
+upstream project unless noted above.
+
+## Licensing and credits
+
+- OpenBGI is **GPL-2.0-only**. See [LICENSE](LICENSE). The Android port
+  retains upstream copyright notices and source license headers.
+- The launcher and game controls use Android framework Views. The Android
+  app has no external Gradle runtime dependencies.
+- Thanks to [Cytlan and OpenBGI contributors](https://github.com/Cytlan/openbgi),
+  and to [WenniDev](https://github.com/WenniDev/openbgi/commit/fd835aac0a793c83494aeaaa5b2a4ef1025dfcaf)
+  for the Subarashiki Hibi 15th Anniversary compatibility changes.
+- See [third-party notices](android/THIRD_PARTY_NOTICES.md) for dependency licenses and source distribution.
+  Game files and translation patches are supplied separately by users.
+
+---
+
+## Upstream OpenBGI
 
 OpenBGI is an open-source reimplementation, in C99, of Ethornell's
 "Buriko General Interpreter" (BGI), the visual-novel engine.  It is
 reverse-engineered function by function from the `tayutama.exe` build
 (ver 1.69, build 444.2, with the "Wave Master" sound library) and
 extended to run the scripts of the engine's other builds, from ver 1.58
-to ver 1.669 (`docs/versions.md`).  Every function keeps the original's
+to ver 1.685 (`docs/versions.md`).  Every function keeps the original's
 results for the same inputs, including its result codes and quirks.  The
 Windows specifics sit behind an OS layer (`inc/bgi/os.h`) with a Win32
 back end, a Linux back end (X11, FreeType, ALSA) and a WebAssembly back
@@ -52,6 +143,7 @@ The games we have been working on, with the engine build each one needs
 | Yumahorome | `Yumahorome` | 1.662 | Boots, but crashes in prolouge |
 | Arcana Alchemia | `ArcanaAlchemia` | 1.667 | Testing in progress |
 | Haruka Ao no Hanayome ni | `HarukaAonoHanayomeni` | 1.669 | Testing in progress |
+| Subarashiki Hibi -15th Anniversary Edition- | `Subarashikihibi15th` | 1.685 | Playable |
 
 ### Definitions
 
@@ -235,8 +327,8 @@ directories offer for "ＭＳ ゴシック" / "ＭＳ 明朝".
     src/dump/       dumping a game's archives into editable files and
                     packing them again (bin/bgidump, bin/bgipack)
     src/vm/         the script machine: threads, the scheduler, the opcode
-                    families (ops_base, ops_sys, ops_sys81, ops_gfx0 .. 2,
-                    ops_snd, ops_ext0, ops_ext1), the tracing aids
+                    families (ops_base, ops_compact, ops_sys, ops_sys81,
+                    ops_gfx0 .. 2, ops_snd, ops_ext0, ops_ext1), the tracing aids
     src/wait/       wait objects (text output, tweens, menus, loads, ...)
     src/sys/        the engine object, main window, display and presentation,
                     input, cursor, panels, child windows, text entry,

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="add">Añadir carpeta del juego</string>
+    <string name="settings">Ajustes</string>
+    <string name="language">Idioma</string>
+    <string name="folders">Carpetas</string>
+    <string name="library">Biblioteca</string>
+    <string name="logs">Registros</string>
+    <string name="empty">Añade una carpeta con un juego de OpenBGI.</string>
+    <string name="game_settings">Ajustes del juego</string>
+    <string name="detected_profile">Usar el perfil detectado</string>
+    <string name="use_config">Usar los argumentos de la configuración del juego</string>
+    <string name="arguments">Argumentos de línea de comandos</string>
+    <string name="choose_cover">Elegir portada</string>
+    <string name="change_cover">Cambiar portada</string>
+    <string name="use_preview">Usar la imagen del juego</string>
+    <string name="remove_game">Quitar de la biblioteca</string>
+    <string name="save">Guardar</string>
+    <string name="cancel">Cancelar</string>
+    <string name="remove_title">¿Quitar de la biblioteca?</string>
+    <string name="remove_message">¿Quitar %1$s de la biblioteca? Se conservarán los archivos y las partidas guardadas.</string>
+    <string name="remove">Quitar</string>
+    <string name="no_log">Inicia un juego para ver su registro.</string>
+    <string name="last_launch">Último inicio</string>
+    <string name="refresh">Actualizar</string>
+    <string name="loading">Cargando…</string>
+    <string name="config_detected">Configuración del juego detectada</string>
+    <string name="launch">Iniciar</string>
+    <string name="version_unknown">No se encontró la versión de BGI. Añade el EXE original o selecciona un perfil manualmente.</string>
+    <string name="profile_unknown">No hay un perfil exacto. Sugerido: %1$s</string>
+    <string name="log_tail">Se muestran los últimos 64 KiB.</string>
+    <string name="log_error">No se pudo leer el registro. Pulsa Actualizar.</string>
+    <string name="cover_error">No se pudo conservar el acceso a la imagen seleccionada.</string>
+    <string name="folder_invalid">Selecciona la carpeta del juego que contiene system.arc o ipl._bp.</string>
+    <string name="folder_permission">Android no concedió acceso persistente a esa carpeta.</string>
+    <string name="game_unreadable">No se puede leer el juego. Añade su carpeta de nuevo.</string>
+    <string name="choose_profile">Elegir perfil</string>
+    <string name="no_matching_profile">No se encontró un perfil compatible. Selecciona uno manualmente.</string>
+</resources>

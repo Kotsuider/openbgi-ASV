@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="add">Adicionar pasta do jogo</string>
+    <string name="settings">Configurações</string>
+    <string name="language">Idioma</string>
+    <string name="folders">Pastas</string>
+    <string name="library">Biblioteca</string>
+    <string name="logs">Registros</string>
+    <string name="empty">Adicione uma pasta com um jogo OpenBGI.</string>
+    <string name="game_settings">Configurações do jogo</string>
+    <string name="detected_profile">Usar o perfil detectado</string>
+    <string name="use_config">Usar argumentos da configuração do jogo</string>
+    <string name="arguments">Argumentos da linha de comando</string>
+    <string name="choose_cover">Escolher capa</string>
+    <string name="change_cover">Trocar capa</string>
+    <string name="use_preview">Usar a imagem do jogo</string>
+    <string name="remove_game">Remover da biblioteca</string>
+    <string name="save">Salvar</string>
+    <string name="cancel">Cancelar</string>
+    <string name="remove_title">Remover da biblioteca?</string>
+    <string name="remove_message">Remover %1$s da biblioteca? Os arquivos do jogo e as partidas salvas serão mantidos.</string>
+    <string name="remove">Remover</string>
+    <string name="no_log">Inicie um jogo para ver seu registro.</string>
+    <string name="last_launch">Última execução</string>
+    <string name="refresh">Atualizar</string>
+    <string name="loading">Carregando…</string>
+    <string name="config_detected">Configuração do jogo detectada</string>
+    <string name="launch">Iniciar</string>
+    <string name="version_unknown">Versão do BGI não encontrada. Adicione o EXE original ou selecione um perfil manualmente.</string>
+    <string name="profile_unknown">Nenhum perfil exato. Sugestão: %1$s</string>
+    <string name="log_tail">Exibindo os últimos 64 KiB.</string>
+    <string name="log_error">Não foi possível ler o registro. Toque em Atualizar.</string>
+    <string name="cover_error">Não foi possível manter o acesso à imagem selecionada.</string>
+    <string name="folder_invalid">Escolha a pasta do jogo que contém system.arc ou ipl._bp.</string>
+    <string name="folder_permission">O Android não concedeu acesso permanente a essa pasta.</string>
+    <string name="game_unreadable">Não foi possível ler o jogo. Adicione a pasta novamente.</string>
+    <string name="choose_profile">Selecionar perfil</string>
+    <string name="no_matching_profile">Nenhum perfil correspondente foi encontrado. Selecione um manualmente.</string>
+</resources>

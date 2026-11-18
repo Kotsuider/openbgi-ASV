@@ -1,0 +1,17 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.openbgi">
+    <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="35" />
+    <application android:label="OpenBGI" android:icon="@mipmap/open_bgi_launcher"
+                 android:roundIcon="@mipmap/open_bgi_launcher"
+                 android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
+        <activity android:name=".MainActivity" android:exported="false"
+                  android:process=":game" android:screenOrientation="landscape"
+                  android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity android:name=".LibraryActivity" android:exported="true"
+                  android:theme="@android:style/Theme.Material.Light.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

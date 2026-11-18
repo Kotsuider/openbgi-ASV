@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="add">Spielordner hinzufügen</string>
+    <string name="settings">Einstellungen</string>
+    <string name="language">Sprache</string>
+    <string name="folders">Ordner</string>
+    <string name="library">Bibliothek</string>
+    <string name="logs">Protokolle</string>
+    <string name="empty">Füge einen Ordner mit einem OpenBGI-Spiel hinzu.</string>
+    <string name="game_settings">Spieleinstellungen</string>
+    <string name="detected_profile">Erkanntes Profil verwenden</string>
+    <string name="use_config">Argumente aus der Spielkonfiguration verwenden</string>
+    <string name="arguments">Befehlszeilenargumente</string>
+    <string name="choose_cover">Cover auswählen</string>
+    <string name="change_cover">Cover ändern</string>
+    <string name="use_preview">Spielvorschau verwenden</string>
+    <string name="remove_game">Aus Bibliothek entfernen</string>
+    <string name="save">Speichern</string>
+    <string name="cancel">Abbrechen</string>
+    <string name="remove_title">Aus Bibliothek entfernen?</string>
+    <string name="remove_message">%1$s aus der Bibliothek entfernen? Spieldateien und Spielstände bleiben erhalten.</string>
+    <string name="remove">Entfernen</string>
+    <string name="no_log">Starte ein Spiel, um dessen Protokoll anzuzeigen.</string>
+    <string name="last_launch">Letzter Start</string>
+    <string name="refresh">Aktualisieren</string>
+    <string name="loading">Wird geladen…</string>
+    <string name="config_detected">Spielkonfiguration erkannt</string>
+    <string name="launch">Starten</string>
+    <string name="version_unknown">BGI-Version nicht gefunden. Füge die Original-EXE des Spiels hinzu oder wähle ein Profil manuell.</string>
+    <string name="profile_unknown">Kein exaktes Profil. Vorschlag: %1$s</string>
+    <string name="log_tail">Die letzten 64 KiB werden angezeigt.</string>
+    <string name="log_error">Das Protokoll konnte nicht gelesen werden. Tippe auf Aktualisieren.</string>
+    <string name="cover_error">Der Zugriff auf das ausgewählte Bild konnte nicht gespeichert werden.</string>
+    <string name="folder_invalid">Wähle den Spielordner mit system.arc oder ipl._bp.</string>
+    <string name="folder_permission">Android hat keinen dauerhaften Zugriff auf den Ordner gewährt.</string>
+    <string name="game_unreadable">Das Spiel kann nicht gelesen werden. Füge seinen Ordner erneut hinzu.</string>
+    <string name="choose_profile">Profil auswählen</string>
+    <string name="no_matching_profile">Kein passendes Profil gefunden. Wähle ein Profil manuell aus.</string>
+</resources>
