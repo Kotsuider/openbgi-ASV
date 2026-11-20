@@ -258,6 +258,22 @@ int OS_PlaySoundFile(const char* path)
 	return 0;
 }
 
+#if defined(BGI_ANDROID)
+extern int Android_MovieOpen(const char* path);
+extern int Android_MovieStart(int x, int y, int w, int h, int volume);
+extern void Android_MovieStop(void);
+extern int Android_MovieRunning(void);
+extern void Android_MovieVolume(int volume);
+int OS_MovieOpen(const char* path) { return Android_MovieOpen(path) ? OS_MOVIE_OK : OS_MOVIE_FAILED; }
+int OS_MovieStart(int x, int y, int w, int h, int32_t volume, int32_t* lengthMs) {
+    int result = Android_MovieStart(x, y, w, h, volume);
+    *lengthMs = result >= 0 ? result : 0;
+    return result >= 0;
+}
+void OS_MovieStop(void) { Android_MovieStop(); }
+int OS_MovieIsRunning(void) { return Android_MovieRunning(); }
+void OS_MovieSetVolume(int32_t vol) { Android_MovieVolume(vol); }
+#else
 int OS_MovieOpen(const char* path)
 {
 	BGI_UNUSED(path);
@@ -288,6 +304,8 @@ void OS_MovieSetVolume(int32_t vol)
 {
 	BGI_UNUSED(vol);
 }
+
+#endif
 
 // no helper programs in the browser: the movie player's ffmpeg route is unavailable
 OsPipeProc_t* OS_PipeProcStart(const char* const* argv)

@@ -148,6 +148,8 @@ public final class LibraryActivity extends LauncherActivity {
             state.putString("editing", editingUri);
             state.putInt("profile", profileChoice.getSelectedItemPosition());
             state.putBoolean("fromConfig", configChoice.isChecked());
+            state.putString("configuration", selectedConfiguration);
+            state.putBoolean("autoFont", autoFontChoice.isChecked());
             state.putString("arguments", configChoice.isChecked() ? customArguments
                     : argumentsField.getText().toString());
         }
@@ -356,11 +358,14 @@ public final class LibraryActivity extends LauncherActivity {
                 io.execute(() -> {
                     GameDocuments docs = new GameDocuments(getContentResolver(), uri);
                     BgiVersion detected = BgiVersion.detect(docs, profiles);
-                    boolean hasConfig = docs.stat(GameLaunchConfig.FILE) != null
-                            || docs.stat("uif_config.json") != null || docs.stat("config.json") != null;
+                    GameConfigurations configurations = new GameConfigurations(LibraryActivity.this, docs);
+                    GameConfigurations.Option selected = configurations.resolve(game.configuration);
+                    boolean hasConfig = !selected.id.equals("none");
                     runOnUiThread(() -> {
                         if (generation != request || isDestroyed()) return;
                         showVersion(version, detected);
+                        if (!game.profileOverride && !selected.engine.isEmpty()) profile.setText(selected.engine);
+                        config.setText(getString(R.string.translation_config) + " · " + selected.label);
                         config.setVisibility(hasConfig ? VISIBLE : GONE);
                     });
                 });
@@ -421,9 +426,11 @@ public final class LibraryActivity extends LauncherActivity {
     private String editingUri, customArguments;
     private Game editingGame;
     private Spinner profileChoice;
-    private CheckBox configChoice;
+    private CheckBox configChoice, autoFontChoice;
+    private Spinner configurationChoice;
+    private String selectedConfiguration;
     private EditText argumentsField;
-    private TextView coverButton, resetButton;
+    private TextView coverButton, resetButton, fontButton, resetFontButton, fontLabel;
 
     private void editGame(Game game, Bundle state) {
         editingGame = game;
@@ -448,6 +455,29 @@ public final class LibraryActivity extends LauncherActivity {
         profileChoice = profile;
         form.addView(profile, new LinearLayout.LayoutParams(-1, dp(48)));
 
+        form.addView(text(getString(R.string.translation_config), 14, muted));
+        Spinner configuration = new Spinner(this, Spinner.MODE_DROPDOWN);
+        configurationChoice = configuration;
+        selectedConfiguration = state == null ? game.configuration : state.getString("configuration", game.configuration);
+        configuration.setEnabled(false);
+        form.addView(configuration, new LinearLayout.LayoutParams(-1, dp(48)));
+        CheckBox automaticFont = new CheckBox(this);
+        automaticFont.setText(R.string.auto_font);
+        automaticFont.setButtonTintList(ColorStateList.valueOf(accent));
+        automaticFont.setChecked(state == null ? game.autoFont : state.getBoolean("autoFont", game.autoFont));
+        autoFontChoice = automaticFont;
+        form.addView(automaticFont);
+        fontLabel = text("", 13, muted);
+        fontLabel.setMaxLines(2);
+        fontLabel.setEllipsize(TextUtils.TruncateAt.END);
+        form.addView(fontLabel);
+        fontButton = formAction(R.string.choose_font, accent, () -> chooseFont(game));
+        resetFontButton = formAction(R.string.reset_font, accent, () -> resetFont(game));
+        form.addView(fontButton, new LinearLayout.LayoutParams(-1, -2));
+        form.addView(formAction(R.string.system_font, accent, () -> chooseSystemFont(game)),
+                new LinearLayout.LayoutParams(-1, -2));
+        form.addView(resetFontButton);
+
         CheckBox config = new CheckBox(this);
         config.setText(R.string.use_config);
         config.setButtonTintList(ColorStateList.valueOf(accent));
@@ -463,6 +493,7 @@ public final class LibraryActivity extends LauncherActivity {
         customArguments = state == null ? (game.arguments == null ? "" : game.arguments)
                 : state.getString("arguments", "");
         String[] defaults = {""};
+        String[] recommendedEngine = {""};
         args.setEnabled(!config.isChecked());
         args.setText(config.isChecked() ? defaults[0] : customArguments);
         form.addView(args, new LinearLayout.LayoutParams(-1, -2));
@@ -499,6 +530,9 @@ public final class LibraryActivity extends LauncherActivity {
                     int index = profile.getSelectedItemPosition();
                     game.profile = index > 0 ? profiles[index - 1] : null;
                     game.arguments = config.isChecked() ? null : args.getText().toString();
+                    game.configuration = selectedConfiguration;
+                    game.profileOverride = game.profile == null || !game.profile.equals(recommendedEngine[0]);
+                    game.autoFont = automaticFont.isChecked();
                     saveGames(game.uri);
                     showLauncher(null);
                 }).create();
@@ -509,12 +543,40 @@ public final class LibraryActivity extends LauncherActivity {
         styleDialogAction(dialog.getButton(AlertDialog.BUTTON_POSITIVE), onAccent, accent);
         io.execute(() -> {
             GameDocuments docs = new GameDocuments(getContentResolver(), Uri.parse(game.uri));
-            String defaultArgs = new GameLaunchConfig(docs).arguments;
+            GameConfigurations configurations = new GameConfigurations(this, docs);
             BgiVersion detected = BgiVersion.detect(docs, profiles);
             runOnUiThread(() -> {
                 if (!dialog.isShowing() || isDestroyed()) return;
-                defaults[0] = defaultArgs;
-                if (config.isChecked()) args.setText(defaultArgs);
+                ArrayAdapter<GameConfigurations.Option> configAdapter = new ArrayAdapter<>(this,
+                        android.R.layout.simple_spinner_item, configurations.options);
+                configAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                configuration.setAdapter(configAdapter);
+                int selectedConfig = configurations.options.size() - 1;
+                for (int i = 0; i < configurations.options.size(); i++)
+                    if (configurations.options.get(i).id.equals(selectedConfiguration)) selectedConfig = i;
+                selectedConfiguration = configurations.options.get(selectedConfig).id;
+                configuration.setSelection(selectedConfig);
+                configuration.setEnabled(true);
+                GameConfigurations.Option initial = configurations.resolve(selectedConfiguration);
+                defaults[0] = initial.arguments;
+                recommendedEngine[0] = initial.engine;
+                int recommendedIndex = adapter.getPosition(initial.engine);
+                if (state == null && !game.profileOverride && recommendedIndex > 0) profile.setSelection(recommendedIndex);
+                if (config.isChecked()) args.setText(defaults[0]);
+                configuration.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                    @Override public void onNothingSelected(AdapterView<?> parent) { }
+                    @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                        String next = configurations.options.get(position).id;
+                        boolean changed = !next.equals(selectedConfiguration);
+                        selectedConfiguration = next;
+                        GameConfigurations.Option option = configurations.resolve(next);
+                        defaults[0] = option.arguments;
+                        recommendedEngine[0] = option.engine;
+                        if (config.isChecked()) args.setText(defaults[0]);
+                        int engineIndex = adapter.getPosition(option.engine);
+                        if (changed && engineIndex > 0) profile.setSelection(engineIndex);
+                    }
+                });
                 showVersion(version, detected);
                 int match = adapter.getPosition(detected.profile);
                 detectedButton.setEnabled(match > 0);
@@ -523,10 +585,37 @@ public final class LibraryActivity extends LauncherActivity {
         });
     }
 
+    private void chooseSystemFont(Game game) {
+        java.util.List<String> families = GameFont.systemFamilies();
+        String current = GameFont.systemFamily(this, game.uri);
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
+                android.R.layout.simple_list_item_single_choice, families) {
+            @Override public View getView(int position, View convertView, ViewGroup parent) {
+                TextView view = (TextView) super.getView(position, convertView, parent);
+                view.setTypeface(Typeface.create(getItem(position), Typeface.NORMAL));
+                return view;
+            }
+        };
+        new AlertDialog.Builder(this).setTitle(R.string.system_font)
+                .setSingleChoiceItems(adapter, families.indexOf(current), (dialog, index) -> {
+                    GameFont.selectSystem(this, game.uri, families.get(index));
+                    dialog.dismiss();
+                    showLauncher(null);
+                }).setNegativeButton(R.string.cancel, null).show();
+    }
+
     private void updateCoverButtons() {
         boolean hasCover = editingGame.cover != null;
         coverButton.setText(hasCover ? R.string.change_cover : R.string.choose_cover);
         resetButton.setVisibility(hasCover ? View.VISIBLE : View.GONE);
+        boolean hasFont = GameFont.exists(this, editingGame.uri);
+        fontButton.setText(hasFont ? R.string.change_font : R.string.choose_font);
+        resetFontButton.setVisibility(hasFont ? View.VISIBLE : View.GONE);
+        String family = GameFont.systemFamily(this, editingGame.uri);
+        fontLabel.setText(!family.isEmpty() ? getString(R.string.selected_system_font, family) :
+                hasFont ? getString(R.string.selected_font, GameFont.name(this, editingGame.uri).isEmpty()
+                        ? getString(R.string.custom_font) : GameFont.name(this, editingGame.uri)) : "");
+        fontLabel.setVisibility(hasFont ? View.VISIBLE : View.GONE);
     }
 
     private View logs() {

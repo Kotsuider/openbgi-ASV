@@ -18,8 +18,12 @@ This fork builds a standalone Android application.
   launcher shows the detected build and flags missing exact profiles.
   For the 1.69 family it can suggest the nearest known build. If there
   is no suggestion, select a profile manually before launching.
-- **Per-game configuration** through `OBAConfig.json`, for cover art,
-  translation configuration and extra OpenBGI arguments.
+- **Per-game configurator.** Choose an engine profile and translation
+  preset, edit launch arguments, pick a cover, and select a font file or
+  Android system font. Settings are saved separately for each game.
+  `OBAConfig.json` and supported UIF configurations are loaded automatically;
+  the bundled JSON presets can also be selected manually. See
+  [configuration and font priorities](#translation-presets-and-font-discovery).
 - **Partial UIF configuration support** for loose-file redirects,
   character substitution and a configured replacement font. Translation
   files can be placed in `patch/` beside the archives.
@@ -42,9 +46,10 @@ This fork builds a standalone Android application.
 3. Tap **+**, select the game folder in the system picker and grant read
    access. Launch from **Folders** or **Library**. To edit launch options,
    tap the profile in **Folders** or long-press the Library card.
-4. In **Game settings**, choose a profile, enter a command-line override
-   or switch back to the game's configured arguments. You can also pick a
-   cover from the gallery or restore the game's own preview.
+4. In **Game settings**, choose an engine profile and translation
+   configuration, enter a command-line override or restore the configured
+   arguments. You can also select a font file or system font, enable or
+   disable automatic font discovery, and pick or reset the cover.
 
 For a translated game, place the patch files, any required fonts, and
 the configuration in the same game folder. Example:
@@ -62,6 +67,65 @@ use the `.bpfa` extension. The translation settings support
 `file_monitor.actions` redirects, `character_substitution`, and
 `font_manager` resource files with font creation override. See the
 [Android guide](android/README.md) for lookup and override rules.
+
+## Translation presets and font discovery
+
+Android game settings include a translation configuration selector. The
+bundled presets live in `android/src/main/assets/game-configs.json` and
+currently cover H2O, Suika A.S+, Sakura no Uta, Eustia and Itsusora.
+Each entry has an `id`, display `name`, `match` aliases, recommended
+`engine`, and `arguments`. Matching uses the game folder name, ignoring
+case, punctuation and spaces. The first matching entry wins.
+
+Automatic selection uses this order:
+
+1. A supported UIF JSON found in the game folder, including the file named
+   by `OBAConfig.json`. The local launch arguments remain available.
+2. `OBAConfig.json` in the game folder.
+3. A matching preset from `game-configs.json`.
+4. No translation configuration.
+
+Game settings allow a manual choice of any available UIF, local config,
+bundled preset, or **None**. The choice, custom arguments, engine profile
+and automatic-font switch are saved per game. Selecting a preset manually
+also selects its recommended engine profile. New games use the preset's
+recommended engine where available, including when an original EXE reports
+a different version. A manually overridden engine takes priority.
+Choosing **None** turns off UIF configuration loading; automatic font
+selection remains controlled by its separate switch.
+
+Android game settings also offer **Choose font** and **Reset font selection**.
+Use **System font** to select an Android font family, with a preview in
+each list row. Standard `sans-serif`, `serif` and `monospace` are always
+listed; additional families and aliases are read from accessible system
+font configuration files. Their availability depends on the device.
+Choosing a system family or importing a file replaces the active manual
+choice for that game. **Reset font selection** clears the manual choice.
+
+Choose a TTF, OTF or TTC file through the system file picker. The app
+validates it and keeps a private copy per game, so the source file can be
+removed afterward. Files up to 64 MiB are accepted; TTC uses the first
+face. A manually selected font has priority over command-line/configured
+fonts, UIF and automatic discovery. Resetting restores the normal font
+selection order. Font selection applies immediately to the next launch,
+like the cover setting. It changes the typeface; encoding, remapping and
+font-size settings continue to come from the game configuration.
+
+On Windows and Android, automatic font discovery searches the game folder
+first, then subfolders in breadth-first order. Files and subfolders are
+sorted by filename within each folder. Supported formats are `.ttf`,
+`.otf` and `.ttc` (first face). Unreadable or unsupported fonts are skipped.
+The scan is limited to 16 directory levels and 4096 folders. A font chosen
+through `--font-file` or UIF takes priority; an explicit `--font-face`
+also prevents automatic discovery. Windows reads the font's internal
+family name, which can differ from its filename. This selects a font;
+translation-specific character mappings still need their configuration.
+
+Use the per-game **Find a font automatically** switch on Android or
+`--no-auto-font` on either platform to disable discovery. `--auto-font`
+enables it explicitly. `OBAConfig.json` can also contain `"auto_font": false`.
+Command-line settings override this field; explicitly configured fonts
+continue to load when automatic discovery is disabled.
 
 ## Translation patch methods
 
@@ -111,21 +175,37 @@ For Windows OpenBGI, select the profile and product name in
 @echo off
 setlocal
 cd /d "%~dp0"
-start "" "OpenBGI.exe" --engine=1.69/472 --productname=H2ORTAAACSE
+start "" "OpenBGI.exe" --engine=1.69/472 --productname=H2ORTAAACSE ^
+  --patch-dir=patch ^
+  --char-remap=003E:00D3,003C:00D5,002B:00B9,0025:00B2,0023:00C9,005E:00AB,0040:00BB,003B:00A1 ^
+  --font-file=OUCTSfontD1.ttf --font-face=OUCTSfontD1 --font-charset=0
 ```
 
-This command supplies the launch settings. Windows OpenBGI currently
-needs the translated resources and font adaptation prepared separately;
-it does not read the Android host's UIF JSON configuration. When running
-the original Windows game with UIF, keep its proxy DLL and the patch's
-`config.json` together.
+`--patch-dir=patch` gives files in that folder priority over the game's
+loose resources and archive entries. Relative paths start at the selected
+game folder. Missing replacements fall back to the original resources.
+This covers resource reads, size and existence queries, and movie paths.
+Save files keep their normal location.
 
-The translated font may place its intended glyphs at other character
-positions. Preserve the patch's font and substitution table together.
-The UIF configuration support described here is implemented in the
-Android host. Windows OpenBGI currently uses its own launch options.
-UIF's executable hooks, window-title overrides and other unimplemented
-JSON sections are outside this subset.
+`--char-remap` supplies comma-separated Unicode hexadecimal pairs in
+`SOURCE:TARGET` form. The H2O table above reproduces its UIF substitutions
+`><+%#^@;` → `ÓÕ¹²É«»¡`. These target characters select the intended glyphs
+in the translation's custom font. Each substitution is applied once,
+after decoding a character, when drawing and measuring it. Script strings
+and control commands keep their original bytes. Up to 64 unique source
+characters are accepted. An empty value clears the table.
+
+Windows OpenBGI does not read UIF's JSON configuration. The launch options
+above provide its resource override, font and character substitution
+settings directly. It does not automatically disable or unload a UIF
+proxy DLL. For a launch without UIF, keep `OpenBGI.exe` in a directory
+without the proxy, or disable the proxy before starting it. Launching a
+separate OpenBGI executable with the game folder as its boot path also
+keeps the proxy out of its executable directory. When running the original
+Windows game with UIF, retain its proxy and configuration.
+
+Android reads the supported UIF JSON sections through its host. UIF's
+executable hooks and window-title overrides are outside this subset.
 
 ### Repacked resources and a modified EXE — Itsusora
 
@@ -238,14 +318,50 @@ The Android host uses the loaded file directly, so the internal family
 name can be omitted. The font-file option is implemented on Android;
 Eustia's text rendering has been verified on Windows.
 
+## Video on Android
+
+Standalone movies opened by the game's `90 F0` command are supported:
+
+- MP4/H.264/AAC uses Android MediaPlayer with a video surface below the
+  editable game buttons. Playback reads the selected game folder directly.
+- MPEG-1 program streams with MP2 audio use the embedded MIT-licensed
+  PL_MPEG decoder. Video is drawn through the engine; audio goes through
+  its existing mixer. No external FFmpeg installation is required.
+
+H2O's `data00500.arc` is an MP4 video with an `.arc` extension, rather than
+an archive. Format detection uses its contents. Its system script calls
+`90 F0`, so it uses the same movie player. Suika A.S+ uses
+`Movie/opening.mpg` (MPEG-1/MP2). Both have been checked on Android.
+Movie stop, volume and completion are connected to the engine's existing
+movie commands. The game script continues to control skipping.
+
+Android native builds use `RelWithDebInfo` (`-O2`). MPEG playback retains
+one file descriptor, precomputes scaling coordinates, and converts only
+the latest frame during catch-up. The **Logs** tab reports playback FPS
+and decode/output time every five seconds. A checked Suika opening segment
+on the test device displayed 30 fps, with about 1.5–1.8 ms for decoding and
+2.8 ms for conversion/output per frame. These are measurements from that
+device and segment, rather than a performance guarantee for other games
+or phones. See the [Android video guide](android/README.md#video-playback).
+
+This covers standalone movie playback. It does not add the separate
+archive-entry player (`92 F0`) or video textures (`91 F*` / `92 F2`).
+The existing BF_Movie frame-sequence decoder is independent of this path.
+Windows and Linux retain their existing native/FFmpeg playback paths.
+
 ## Compatibility and builds
 
 - **H2O after and another Complete Story Edition** was tested on Android
   with profile `1.69/472`, Russian translation assets, audio, saving and
   loading.
 - **Suika A.S+** reaches the title menu and starts a scene with
-  `1.69/472` and `--productname=SuikaENG`. The Android build currently
-  skips the opening movie.
+  `1.69/472` and `--productname=SuikaENG`. Its MPEG-1/MP2 opening also
+  plays on Android through the embedded PL_MPEG decoder.
+- **Sakura no Uta (Russian translation)** has a bundled `1.616` preset
+  with `--productname=Sakuranouta`, `repair/YasuSakuuta.ttf`, font family
+  `YasuSakuuta`, `--font-codepage=1252` and `--font-charset=1`. The preset
+  supplies the recommended engine even if the patched EXE reports a
+  different build. A manual engine override takes priority.
 - **Subarashiki Hibi 15th Anniversary Edition** has the `1.685` runtime
   changes from WenniDev. The VM instructions were tested, and the game
   itself has yet to be verified on Android.
@@ -256,7 +372,7 @@ upstream project unless noted above.
 
 ## Windows release
 
-The experimental Windows package is `OpenBGI-ASV-0.2-windows-x86.zip`.
+The experimental Windows package is `OpenBGI-ASV-0.3-windows-x86.zip`.
 Extract it into its own folder and run `OpenBGI.exe` to open the game
 picker. Select a game directory and use **Advanced** for its engine
 profile and launch arguments. The launcher records games in `games.json`.

@@ -18,14 +18,18 @@ import org.json.JSONObject;
 public abstract class LauncherActivity extends Activity {
     static { System.loadLibrary("openbgi_android"); }
     protected static native String[] engineProfiles();
-    private static final int CHOOSE_GAME = 1, CHOOSE_COVER = 2;
-    private String coverGame;
+    private static final int CHOOSE_GAME = 1, CHOOSE_COVER = 2, CHOOSE_FONT = 3;
+    private String coverGame, fontGame;
+    private android.app.ProgressDialog fontProgress;
 
     protected static final class Game {
         final String uri, name;
         String profile;
         String cover;
         String arguments;
+        String configuration = "auto";
+        boolean autoFont = true;
+        boolean profileOverride;
 
         Game(String uri, String name, String profile) {
             this.uri = uri;
@@ -39,6 +43,7 @@ public abstract class LauncherActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         coverGame = state == null ? null : state.getString("coverGame");
+        fontGame = state == null ? null : state.getString("fontGame");
         loadGames();
         showLauncher(null);
     }
@@ -72,6 +77,9 @@ public abstract class LauncherActivity extends Activity {
                         item.optString("profile", null));
                 game.cover = item.optString("cover", null);
                 game.arguments = item.optString("arguments", null);
+                game.configuration = item.optString("configuration", "auto");
+                game.autoFont = item.optBoolean("autoFont", true);
+                game.profileOverride = item.optBoolean("profileOverride", false);
                 games.add(game);
             }
         } catch (JSONException error) {
@@ -89,6 +97,9 @@ public abstract class LauncherActivity extends Activity {
                 item.put("profile", game.profile);
                 item.put("cover", game.cover);
                 item.put("arguments", game.arguments);
+                item.put("configuration", game.configuration);
+                item.put("autoFont", game.autoFont);
+                item.put("profileOverride", game.profileOverride);
                 list.put(item);
             }
             settings().edit().putString("games", list.toString())
@@ -109,6 +120,32 @@ public abstract class LauncherActivity extends Activity {
     @Override protected void onSaveInstanceState(Bundle state) {
         super.onSaveInstanceState(state);
         state.putString("coverGame", coverGame);
+        state.putString("fontGame", fontGame);
+    }
+
+    @Override protected void onDestroy() {
+        if (fontProgress != null) fontProgress.dismiss();
+        super.onDestroy();
+    }
+
+    protected void chooseFont(Game game) {
+        fontGame = game.uri;
+        Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        picker.addCategory(Intent.CATEGORY_OPENABLE);
+        picker.setType("*/*");
+        picker.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try { startActivityForResult(picker, CHOOSE_FONT); }
+        catch (ActivityNotFoundException error) { showFontError(); }
+    }
+
+    protected void resetFont(Game game) {
+        if (!GameFont.reset(this, game.uri)) { showFontError(); return; }
+        saveGames(game.uri);
+        showLauncher(null);
+    }
+
+    private void showFontError() {
+        android.widget.Toast.makeText(this, R.string.font_error, android.widget.Toast.LENGTH_LONG).show();
     }
 
     protected void chooseCover(Game game) {
@@ -131,7 +168,28 @@ public abstract class LauncherActivity extends Activity {
         super.onActivityResult(request, result, data);
         if (result != RESULT_OK || data == null || data.getData() == null) return;
         Uri uri = data.getData();
-        if (request == CHOOSE_COVER) {
+        if (request == CHOOSE_FONT) {
+            for (Game game : games) {
+                if (!game.uri.equals(fontGame)) continue;
+                android.app.ProgressDialog progress = android.app.ProgressDialog.show(this, null, getString(R.string.loading), true, false);
+                fontProgress = progress;
+                new Thread(() -> {
+                    String name = null;
+                    try { name = GameFont.copy(getApplicationContext(), game.uri, uri); }
+                    catch (java.io.IOException | RuntimeException error) {
+                        android.util.Log.w("OpenBGI", "Cannot import game font", error);
+                    }
+                    String importedName = name;
+                    runOnUiThread(() -> {
+                        if (!isDestroyed()) progress.dismiss();
+                        if (importedName != null && games.contains(game)) {
+                            if (!isDestroyed()) showLauncher(null);
+                        } else if (!isDestroyed()) showFontError();
+                    });
+                }, "OpenBGI-FontImport").start();
+                break;
+            }
+        } else if (request == CHOOSE_COVER) {
             for (Game game : games) {
                 if (!game.uri.equals(coverGame)) continue;
                 try {
@@ -175,7 +233,9 @@ public abstract class LauncherActivity extends Activity {
                 return;
             }
         }
-        games.add(new Game(uri, documents.name(), BgiVersion.detect(documents, engineProfiles()).profile));
+        GameConfigurations.Option configuration = new GameConfigurations(this, documents).automatic;
+        String engine = configuration.engine.isEmpty() ? BgiVersion.detect(documents, engineProfiles()).profile : configuration.engine;
+        games.add(new Game(uri, documents.name(), engine));
         saveGames(uri);
         showLauncher(null);
     }
@@ -205,6 +265,7 @@ public abstract class LauncherActivity extends Activity {
 
     protected void removeGame(Game game) {
         games.remove(game);
+        GameFont.reset(this, game.uri);
         String selected = settings().getString("selectedGame", "");
         if (game.uri.equals(selected)) selected = games.isEmpty() ? "" : games.get(0).uri;
         saveGames(selected);
@@ -225,6 +286,9 @@ public abstract class LauncherActivity extends Activity {
         intent.putExtra("game", game.name);
         intent.putExtra("profile", game.profile);
         intent.putExtra("arguments", game.arguments);
+        intent.putExtra("configuration", game.configuration);
+        intent.putExtra("autoFont", game.autoFont);
+        intent.putExtra("profileOverride", game.profileOverride);
         startActivity(intent);
     }
 

@@ -75,6 +75,41 @@ uint32_t File_Size(File_t* f)
 
 // ---- loose files ----------------------------------------------------------------------------
 
+static char gPatchDir[0x104];
+
+int File_SetPatchDir(const char* dir)
+{
+	if(strlen(dir) >= sizeof gPatchDir)
+		return 0;
+	strcpy(gPatchDir, dir);
+	return 1;
+}
+
+int File_PatchPath(char* dst, size_t capacity, const char* name)
+{
+	uint32_t attrs;
+	int n;
+	const char* p;
+	if(!gPatchDir[0] || !name || !*name || name[0] == '/' || name[0] == '\\' || strchr(name, ':'))
+		return 0;
+	// Resource names stay inside the patch directory.
+	for(p = name; *p; )
+	{
+		const char* component = p;
+		while(*p && *p != '/' && *p != '\\') p++;
+		if(p - component == 2 && component[0] == '.' && component[1] == '.') return 0;
+		if(*p) p++;
+	}
+	if(gPatchDir[0] == '/' || gPatchDir[0] == '\\' || gPatchDir[1] == ':')
+		n = snprintf(dst, capacity, "%s/%s", gPatchDir, name);
+	else
+		n = snprintf(dst, capacity, "%s%s/%s", gBaseDir, gPatchDir, name);
+	if(n < 0 || (size_t)n >= capacity)
+		return 0;
+	attrs = OS_FileAttrs(dst);
+	return attrs != OS_INVALID_ATTRS && !(attrs & OS_ATTR_DIRECTORY);
+}
+
 /* Read [off, off + size) of a file (off = size = 0: all of it) into buf,
  * or - with buf NULL - only report the size.  0 ok, 1 cannot open (or
  * the drive is not ready), 2 the range reaches past the end, 3 the size
@@ -140,6 +175,8 @@ int ReadFileEx(void* buf, uint32_t* outSize, const char* dir, const char* name, 
 {
 	char path[0x104];
 	int r;
+	if(File_PatchPath(path, sizeof path, name))
+		return ReadFileRange(buf, outSize, path, off, size);
 	if(name[0] == '\\' || name[1] == ':')
 		return ReadFileRange(buf, outSize, name, off, size);
 	sprintf(path, "%s%s", dir, name);

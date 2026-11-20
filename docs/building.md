@@ -51,7 +51,62 @@ Optional at run time, not linked:
 
 `OPT=...` replaces the optimisation flags (`-O2 -g` by default).
 
+## Android native optimisation
+
+Android APKs use the CMake/Gradle build described in
+[android/README.md](../android/README.md). The native Ninja build defaults
+to `RelWithDebInfo`, and `android/build-apk.ps1` selects that build type
+explicitly. This enables `-O2` while retaining native debug information.
+An empty CMake build type produces unoptimised code and can noticeably
+slow the software MPEG decoder. The Gradle APK variant and the CMake
+native build type are separate settings.
+
+PL_MPEG is vendored at a pinned revision in `src/third_party/pl_mpeg.h`.
+Android MPEG-1/MP2 playback therefore needs no additional codec download.
+MP4/H.264/AAC uses Android MediaPlayer. These Android paths do not use the
+optional desktop `ffmpeg`/`ffprobe` helpers described above. See
+[third-party notices](../android/THIRD_PARTY_NOTICES.md) for source and
+license information.
+
+
 ## Targets
+
+`--auto-font` / `--no-auto-font` control launch-time font discovery, enabled
+by default on Windows and Android. `--auto-font=1` / `--auto-font=0` are
+aliases. The game folder is searched first, then subfolders in breadth-first
+order, with names sorted within each directory. Supported SFNT formats
+are TTF, OTF and TTC (first face). A configured font file or family skips
+discovery. The Android host also skips it when UIF has loaded a font.
+`OBAConfig.json` supports `"auto_font": false`; explicit launch options
+win over this field. The selected automatic font is reported in the log.
+
+
+`--patch-dir=DIR` searches that directory before loose game resources and
+archive entries. A relative directory is resolved against the selected
+game folder. Reads, decoded reads, size checks, existence checks and movie
+paths use the replacement. Saves are unaffected. Resource subdirectories
+are preserved. Absolute resource names and parent traversal are excluded.
+An empty value disables this override.
+
+`--char-remap=003E:00D3,003C:00D5` replaces Unicode glyphs while drawing
+and measuring text. Pairs use hexadecimal scalar values without `U+`, with
+at most 64 unique sources. Replacements are simultaneous, so they do not
+cascade. Invalid tables are reported and leave the previous table intact.
+`--char-remap=` clears the table. Apply these settings at launch, before
+fonts and glyph caches are created. The script encoding and string
+operations remain unchanged. The README includes a complete H2O example.
+
+
+Windows font selection defaults to `SHIFTJIS_CHARSET` (128), including
+with a family override. Use `--font-charset=N` to set the GDI charset
+explicitly (0..255). Common values are 0 (ANSI), 1 (DEFAULT), 128
+(SHIFTJIS) and 204 (RUSSIAN). The selected charset applies to both normal
+and monochrome fonts. Windows font availability determines the result.
+This setting controls GDI font selection. `--font-codepage` separately
+controls conversion of single-byte glyph bytes into Unicode.
+
+For Sakura no Uta's custom font, use
+`--font-file=repair\YasuSakuuta.ttf --font-face=YasuSakuuta --font-charset=1 --font-codepage=1252`.
 
 The Windows game picker opens automatically when the current directory
 contains neither `system.arc` nor `ipl._bp` and no boot path is supplied.
@@ -75,6 +130,20 @@ before the game creates its fonts. On Windows, use its internal family
 name with `--font-face`; this can differ from the filename.
 On Android, paths are relative to the selected game folder and the loaded
 file is selected directly, taking priority over UIF and family overrides.
+
+Windows also resolves relative font paths against the selected game
+directory, including when the launcher starts elsewhere. For a font in
+a subfolder, use `--font-file=repair\YasuSakuuta.ttf`. Paths with spaces
+can be quoted, as in `--font-file="repair\My Font.ttf"`. Absolute
+Windows paths are also accepted.
+
+Some translation fonts assign punctuation to Latin-1 or other single-byte
+character positions. On Windows, `--font-codepage=1252` changes the
+conversion of single-byte glyphs for drawing and font measurement.
+For example, Sakura no Uta's YasuSakuuta font uses byte D1 as a comma,
+A5 as a full stop and C9 as a dash. This option affects glyph conversion;
+script parsing, double-byte CP932 characters and UTF-8 text keep their
+existing encoding. The code page must be installed on Windows.
 Font weight overrides are supported on Windows and Android. With width
 zero, horizontal Cyrillic and ASCII use the font's natural advances.
 
@@ -190,3 +259,13 @@ What none of these covers is the JavaScript in the browser - the canvas
 text, the `keyCode` mapping, the Web Audio scheduling, Asyncify's
 behaviour - so the first real `make wasm` and page load may also need a
 round of small fixes.
+
+## Windows release packaging
+
+After building the Windows executable, run `tools/package-windows.ps1`.
+It reads the release version from `android/build.gradle`, strips a copy
+of `bin/bgi.exe`, and creates a clean ZIP under `bin/releases/<version>/`.
+The package contains the launcher command, Windows instructions, release
+notes, GPL license and the Vorbis decoder notice. Personal `games.json`
+settings and game files are excluded. Pass `-Binary`, `-Strip`, or
+`-Version` to override the defaults.

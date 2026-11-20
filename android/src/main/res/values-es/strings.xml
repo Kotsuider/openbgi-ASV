@@ -36,4 +36,16 @@
     <string name="game_unreadable">No se puede leer el juego. Añade su carpeta de nuevo.</string>
     <string name="choose_profile">Elegir perfil</string>
     <string name="no_matching_profile">No se encontró un perfil compatible. Selecciona uno manualmente.</string>
+    <string name="translation_config">Configuración de traducción</string>
+    <string name="config_none">Ninguna</string>
+    <string name="config_auto">Automática · %1$s</string>
+    <string name="auto_font">Buscar una fuente automáticamente</string>
+    <string name="choose_font">Elegir fuente</string>
+    <string name="change_font">Cambiar fuente</string>
+    <string name="reset_font">Restablecer fuente</string>
+    <string name="selected_font">Fuente seleccionada: %1$s</string>
+    <string name="custom_font">Fuente personalizada</string>
+    <string name="font_error">No se pudo cargar la fuente. Elige un archivo TTF, OTF o TTC válido de hasta 64 MiB.</string>
+    <string name="system_font">Fuente del sistema</string>
+    <string name="selected_system_font">Fuente del sistema: %1$s</string>
 </resources>

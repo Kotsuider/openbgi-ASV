@@ -36,4 +36,16 @@
     <string name="game_unreadable">Impossible de lire le jeu. Ajoutez à nouveau son dossier.</string>
     <string name="choose_profile">Choisir un profil</string>
     <string name="no_matching_profile">Aucun profil compatible trouvé. Sélectionnez-en un manuellement.</string>
+    <string name="translation_config">Configuration de traduction</string>
+    <string name="config_none">Aucune</string>
+    <string name="config_auto">Automatique · %1$s</string>
+    <string name="auto_font">Rechercher une police automatiquement</string>
+    <string name="choose_font">Choisir une police</string>
+    <string name="change_font">Changer de police</string>
+    <string name="reset_font">Réinitialiser la police</string>
+    <string name="selected_font">Police sélectionnée : %1$s</string>
+    <string name="custom_font">Police personnalisée</string>
+    <string name="font_error">Impossible de charger la police. Choisissez un fichier TTF, OTF ou TTC valide de 64 Mio maximum.</string>
+    <string name="system_font">Police système</string>
+    <string name="selected_system_font">Police système : %1$s</string>
 </resources>

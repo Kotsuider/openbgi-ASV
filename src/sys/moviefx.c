@@ -23,6 +23,7 @@
  * ended and everything read was shown or heard; Movie_OnEvent then does
  * what the DirectShow EC_COMPLETE did.
  */
+#if !defined(BGI_ANDROID)
 #include "bgi/gfx.h"
 #include "bgi/display.h"
 #include "bgi/snd/wavemaster.h"
@@ -357,3 +358,5 @@ int MovieFx_Tick(void)
 	}
 	return 1;
 }
+
+#endif // !BGI_ANDROID

@@ -20,6 +20,11 @@
 
 #include "bgi/common.h"
 
+// Rendering-only Unicode substitutions. Hex pairs, e.g. 003E:00D3,003C:00D5.
+// Invalid tables leave the previous table unchanged; empty clears it.
+int Text_SetCharRemap(const char* pairs);
+uint32_t Text_RemapUnicode(uint32_t code);
+
 int SjisIsLead(uint8_t c);                                                    // 1 for the first byte of a double-byte character (0x80..0x9F, 0xE0..0xFF)
 int SjisGetChar(uint32_t* out, const char* s);                                // the Shift-JIS code at s (lead << 8 | trail); 1 when double byte
 int IsKinsokuChar(uint32_t ch);                                               // line-head prohibited (kinsoku) punctuation, in the current encoding

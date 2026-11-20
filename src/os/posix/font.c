@@ -31,6 +31,7 @@
  */
 #include "bgi/os.h"
 #include "bgi/os_common.h"
+#include "bgi/strutil.h"
 #include "bgi/os_posix.h"
 
 #include <dirent.h>
@@ -604,7 +605,7 @@ void OS_FontClose(OsFont_t* f)
 // the Unicode code point of a character of `len` bytes in the text encoding
 static uint32_t SjisCodePoint(const char* sjis, int len)
 {
-	return OsCommon_CodePoint(sjis, len, OsPosix_SjisChar);
+	return Text_RemapUnicode(OsCommon_CodePoint(sjis, len, OsPosix_SjisChar));
 }
 
 // ---- fallback fonts ------------------------------------------------------------

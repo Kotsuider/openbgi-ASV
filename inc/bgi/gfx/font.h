@@ -188,4 +188,8 @@ void MonoGlyph_Paint(Bmp_t* cell, MonoGlyph_t* g, int code, MonoFont_t* font, ui
 void MonoText_Draw(Bmp_t* dst, int x, int y, const char* str, MonoFont_t* font, int spacing, uint32_t colour,
 	int32_t* outWidth);
 
+// Font files used by launch-time automatic discovery.
+int FontFile_Family(const char* path, char* utf8, size_t capacity);
+int FontFile_AutoLoad(const char* directory, char* chosen, size_t capacity);
+
 #endif // BGI_GFX_FONT_H_

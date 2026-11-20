@@ -21,40 +21,72 @@ public final class MainActivity extends Activity {
     private native int runEngine(String overlay, String profile, String arguments, String logPath);
     private native void input(int type, int x, int y, int down, int button);
     private GameView view;
+    private AndroidMovie movie;
     private GameDocuments documents;
     private TranslationConfig translation;
     private final ArrayList<Paint> fonts = new ArrayList<>();
-    private Typeface externalTypeface;
+    private Typeface externalTypeface, manualTypeface;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         String folder = getIntent().getStringExtra("game");
-        String profile = getIntent().getStringExtra("profile");
+        String initialProfile = getIntent().getStringExtra("profile");
         android.net.Uri tree = getIntent().getData();
         String saveKey = tree == null ? "" : java.util.UUID.nameUUIDFromBytes(
                 tree.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
         File overlay = new File(new File(getFilesDir(), "saves"), saveKey);
-        if (tree == null || profile == null || (!overlay.isDirectory() && !overlay.mkdirs())) {
+        if (tree == null || (!overlay.isDirectory() && !overlay.mkdirs())) {
             showStatus("Game folder or save storage is unavailable.");
             return;
         }
         documents = new GameDocuments(getContentResolver(), tree);
         view = new GameView();
-        setContentView(new GameControls(this, view, this::pressVirtualKey, this::setVirtualKey));
+        GameControls controls = new GameControls(this, view, this::pressVirtualKey, this::setVirtualKey);
+        setContentView(controls);
+        movie = new AndroidMovie(this, documents, controls, (x, y, w, h) -> {
+            synchronized (view) {
+                if (view.frame == null) return new Rect(0, 0, view.getWidth(), view.getHeight());
+                view.fitFrame();
+                float sx = view.bounds.width() / view.frame.getWidth();
+                float sy = view.bounds.height() / view.frame.getHeight();
+                return new Rect(Math.round(view.bounds.left + x * sx), Math.round(view.bounds.top + y * sy),
+                        Math.round(view.bounds.left + (x+w) * sx), Math.round(view.bounds.top + (y+h) * sy));
+            }
+        });
         new Thread(() -> {
-            GameLaunchConfig config = new GameLaunchConfig(documents);
+            GameConfigurations configurations = new GameConfigurations(this, documents);
+            GameConfigurations.Option config = configurations.resolve(getIntent().getStringExtra("configuration"));
+            String profile = !getIntent().getBooleanExtra("profileOverride", false) && !config.engine.isEmpty()
+                    ? config.engine : initialProfile;
+            if (profile == null) {
+                runOnUiThread(() -> showStatus(getString(R.string.no_matching_profile)));
+                return;
+            }
             String override = getIntent().getStringExtra("arguments");
+            String launchArguments = override == null ? config.arguments : override;
             translation = new TranslationConfig(documents, config.uif);
+            manualTypeface = GameFont.load(this, tree.toString());
+            if (!getIntent().getBooleanExtra("autoFont", true) || !config.autoFont || translation.hasFont() || manualTypeface != null)
+                launchArguments += " --no-auto-font";
+            android.util.Log.i("OpenBGI", "Configuration: " + config.label);
             documents.setTranslation(translation);
             File log = new File(getFilesDir(), "openbgi-last.log");
             try (java.io.FileOutputStream stream = new java.io.FileOutputStream(log)) {
-                String header = new java.util.Date() + "\n" + folder + " | Profile: " + profile + "\n\n";
+                String header = new java.util.Date() + "\n" + folder + " | Profile: " + profile + "\nConfiguration: " + config.label + "\n\n";
                 stream.write(header.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             } catch (java.io.IOException error) {
                 android.util.Log.w("OpenBGI", "Cannot create launch log", error);
             }
+            if (manualTypeface != null) {
+                try (java.io.FileOutputStream stream = new java.io.FileOutputStream(log, true)) {
+                    String systemFamily = GameFont.systemFamily(this, tree.toString());
+                    String selectedFont = systemFamily.isEmpty() ? GameFont.name(this, tree.toString()) : "system family " + systemFamily;
+                    stream.write(("Using manually selected game font: " + selectedFont + "\n")
+                            .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                } catch (java.io.IOException error) { android.util.Log.w("OpenBGI", "Cannot log game font", error); }
+            }
             int result = runEngine(overlay.getAbsolutePath(), profile,
-                    override == null ? config.arguments : override, log.getAbsolutePath());
+                    launchArguments, log.getAbsolutePath());
             runOnUiThread(() -> {
                 if (result != 0) android.util.Log.w("OpenBGI", "Engine exit: " + result);
                 finish();
@@ -72,6 +104,7 @@ public final class MainActivity extends Activity {
 
     @Override protected void onDestroy() {
         if (view != null) input(7, 0, 0, 0, 0);
+        if (movie != null) movie.stop();
         super.onDestroy();
     }
 
@@ -82,6 +115,12 @@ public final class MainActivity extends Activity {
         text.setText(message);
         setContentView(text);
     }
+
+    private boolean movieOpen(String path) { return movie.open(path); }
+    private int movieStart(int x, int y, int w, int h, int volume) { return movie.start(x, y, w, h, volume); }
+    private void movieStop() { movie.stop(); }
+    private boolean movieRunning() { return movie.isRunning(); }
+    private void movieVolume(int volume) { movie.setVolume(volume); }
 
     private int[] documentStat(String path) { return documents.stat(path); }
     private int documentOpen(String path) { return documents.open(path); }
@@ -135,7 +174,10 @@ public final class MainActivity extends Activity {
     }
 
     private boolean fontAddFile(String path) {
-        int fd = documents.openOriginal(path.replace('\\', '/'));
+        String relative = path.replace('\\', '/');
+        if (relative.startsWith("C:/") || relative.startsWith("c:/")) relative = relative.substring(3);
+        while (relative.startsWith("/")) relative = relative.substring(1);
+        int fd = documents.openOriginal(relative);
         if (fd < 0) return false;
         try (android.os.ParcelFileDescriptor file = android.os.ParcelFileDescriptor.adoptFd(fd)) {
             Typeface loaded = new Typeface.Builder(file.getFileDescriptor()).build();
@@ -149,11 +191,24 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private final java.util.Map<Integer, Charset> glyphCodepages = new java.util.HashMap<>();
+    private int fontDecode(int value, int codepage) {
+        Charset charset = glyphCodepages.get(codepage);
+        if (charset == null) {
+            try { charset = Charset.forName(codepage == 932 ? "windows-31j" : "windows-" + codepage); }
+            catch (RuntimeException error) { charset = Charset.forName("windows-31j"); }
+            glyphCodepages.put(codepage, charset);
+        }
+        String decoded = new String(new byte[]{(byte)value}, charset);
+        return decoded.isEmpty() ? value : decoded.codePointAt(0);
+    }
+
     private int fontOpen(String family, int height, int width, int weight, int italic) {
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setColor(Color.WHITE);
         Typeface base = family == null ? translation.typeface() : Typeface.create(family, Typeface.NORMAL);
         if (externalTypeface != null) base = externalTypeface;
+        if (manualTypeface != null) base = manualTypeface;
         paint.setTypeface(Typeface.create(base, weight, italic != 0));
         paint.setTextSize(100);
         Paint.FontMetrics metrics = paint.getFontMetrics();

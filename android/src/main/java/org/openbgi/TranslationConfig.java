@@ -35,12 +35,21 @@ final class TranslationConfig {
     private final Map<Integer, Integer> glyphs = new HashMap<>();
     private Typeface font;
 
+    static String findConfig(GameDocuments documents, String configured) {
+        for (String name : new String[]{configured, "uif_config.json", "config.json"}) {
+            if (name == null || name.isEmpty() || !documents.hasOriginalFile(name.replace('\\', '/'))) continue;
+            JSONObject json = read(documents, name);
+            if (json.has("file_monitor") || json.has("character_substitution") || json.has("font_manager")) return name;
+        }
+        return "";
+    }
+
     TranslationConfig(GameDocuments documents, String configuredUif) {
-        JSONObject root = read(documents, configuredUif, "uif_config.json", "config.json");
+        JSONObject root = configuredUif.isEmpty() ? new JSONObject() : read(documents, configuredUif);
         JSONObject files = root.optJSONObject("file_monitor");
-        if (files == null) {
+        if (files == null && !configuredUif.isEmpty()) {
             redirects.add(new Redirect("^(?:.*/)?([a-zA-Z0-9_]+(?:\\._bp)?)$", "patch/$1"));
-        } else if (files.optBoolean("enable")) {
+        } else if (files != null && files.optBoolean("enable")) {
             JSONArray actions = files.optJSONArray("actions");
             for (int i = 0; actions != null && i < actions.length(); ++i) {
                 JSONObject action = actions.optJSONObject(i);
@@ -137,6 +146,8 @@ final class TranslationConfig {
     int glyph(int cp) {
         return glyphs.getOrDefault(cp, cp);
     }
+
+    boolean hasFont() { return font != null; }
 
     Typeface typeface() {
         return font == null ? Typeface.SANS_SERIF : font;

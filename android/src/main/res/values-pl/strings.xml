@@ -36,4 +36,16 @@
     <string name="game_unreadable">Nie można odczytać gry. Dodaj jej folder ponownie.</string>
     <string name="choose_profile">Wybierz profil</string>
     <string name="no_matching_profile">Nie znaleziono pasującego profilu. Wybierz go ręcznie.</string>
+    <string name="translation_config">Konfiguracja tłumaczenia</string>
+    <string name="config_none">Brak</string>
+    <string name="config_auto">Automatycznie · %1$s</string>
+    <string name="auto_font">Automatycznie znajdź czcionkę</string>
+    <string name="choose_font">Wybierz czcionkę</string>
+    <string name="change_font">Zmień czcionkę</string>
+    <string name="reset_font">Resetuj wybór czcionki</string>
+    <string name="selected_font">Wybrana czcionka: %1$s</string>
+    <string name="custom_font">Własna czcionka</string>
+    <string name="font_error">Nie można wczytać czcionki. Wybierz poprawny plik TTF, OTF lub TTC do 64 MiB.</string>
+    <string name="system_font">Czcionka systemowa</string>
+    <string name="selected_system_font">Czcionka systemowa: %1$s</string>
 </resources>

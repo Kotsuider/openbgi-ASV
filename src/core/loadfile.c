@@ -297,6 +297,8 @@ static int LoadDirDecoded(void* buf, const char* dir, const char* name, uint32_t
 {
 	char path[0x104];
 	int r;
+	if(File_PatchPath(path, sizeof path, name))
+		return LoadLooseDecoded(buf, path, off, size, out);
 	if(name[0] == '\\' || name[1] == ':')
 		return LoadLooseDecoded(buf, name, off, size, out);
 	sprintf(path, "%s%s", dir, name);
@@ -541,6 +543,8 @@ int Dir_Exists(const char* dir, const char* name)
 	uint32_t a;
 	int r;
 	SearchNode_t* n;
+	if(File_PatchPath(path, sizeof path, name))
+		return 1;
 	if(!DriveReady(dir))
 		return 0;
 	sprintf(path, "%s%s", dir, name);
@@ -582,6 +586,8 @@ int FileExists(const char* arc, const char* name)
 int FindMoviePath(char* dst, const char* name)
 {
 	char path[0x104];
+	if(File_PatchPath(dst, 0x104, name))
+		return 1;
 	PathJoin(path, gBaseDir, name);
 	if(OS_FileAttrs(path) != OS_INVALID_ATTRS)
 	{
