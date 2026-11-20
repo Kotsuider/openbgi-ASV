@@ -36,4 +36,16 @@
     <string name="game_unreadable">Не удалось прочитать файлы игры. Добавьте папку заново, чтобы восстановить доступ.</string>
     <string name="choose_profile">Выбрать профиль</string>
     <string name="no_matching_profile">Подходящий профиль не найден. Выберите его вручную.</string>
+    <string name="translation_config">Конфигурация перевода</string>
+    <string name="config_none">Нет</string>
+    <string name="config_auto">Автоматически · %1$s</string>
+    <string name="auto_font">Искать шрифт автоматически</string>
+    <string name="choose_font">Выбрать шрифт</string>
+    <string name="change_font">Изменить шрифт</string>
+    <string name="reset_font">Сбросить выбор шрифта</string>
+    <string name="selected_font">Выбранный шрифт: %1$s</string>
+    <string name="custom_font">Свой шрифт</string>
+    <string name="font_error">Не удалось загрузить шрифт. Выберите корректный файл TTF, OTF или TTC размером до 64 МиБ.</string>
+    <string name="system_font">Системный шрифт</string>
+    <string name="selected_system_font">Системный шрифт: %1$s</string>
 </resources>

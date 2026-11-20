@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "configs": [
+    {
+      "id": "h2o-ru",
+      "name": "H2O — Russian (UIF replacement)",
+      "match": [
+        "h2o after and another",
+        "h2o_after_and_another",
+        "H2ORTAAACSE"
+      ],
+      "engine": "1.69/472",
+      "arguments": "--productname=H2ORTAAACSE --patch-dir=patch --char-remap=003E:00D3,003C:00D5,002B:00B9,0025:00B2,0023:00C9,005E:00AB,0040:00BB,003B:00A1 --font-file=OUCTSfontD1.ttf --font-face=OUCTSfontD1 --font-charset=0"
+    },
+    {
+      "id": "sakura-ru",
+      "name": "Sakura no Uta — Russian",
+      "match": [
+        "Sakura no Uta",
+        "Sakuranouta",
+        "Стих Сакуры",
+        "サクラノ詩"
+      ],
+      "engine": "1.616",
+      "arguments": "--productname=Sakuranouta --font-file=repair/YasuSakuuta.ttf --font-face=YasuSakuuta --font-codepage=1252 --font-charset=1"
+    },
+    {
+      "id": "eustia-ru",
+      "name": "Aiyoku no Eustia — Russian",
+      "match": [
+        "Eustia",
+        "AiyokunoEustia",
+        "穢翼のユースティア"
+      ],
+      "engine": "1.529",
+      "arguments": "--productname=AiyokunoEustia_Product --font-file=EustiaFont.ttf --font-face=EET --font-width=0 --letter-spacing=0"
+    },
+    {
+      "id": "itsusora-ru",
+      "name": "Itsuka, Todoku, Ano Sora ni — Russian",
+      "match": [
+        "Itsusora",
+        "ItsukaTodokuAnoSorani",
+        "Itsuka Todoku Ano Sora ni"
+      ],
+      "engine": "1.66",
+      "arguments": "--productname=ItsukaTodokuAnoSorani --font-size=24 --font-width=0 --font-weight=400 --letter-spacing=2"
+    },
+    {
+      "id": "suika-as",
+      "name": "Suika A.S+ — English",
+      "match": [
+        "Suika A.S+",
+        "Suika AS",
+        "SuikaENG"
+      ],
+      "engine": "1.69/472",
+      "arguments": "--productname=SuikaENG"
+    }
+  ]
+}

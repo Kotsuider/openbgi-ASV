@@ -36,4 +36,16 @@
     <string name="game_unreadable">無法讀取此遊戲。請重新新增其資料夾。</string>
     <string name="choose_profile">選擇設定檔</string>
     <string name="no_matching_profile">找不到相符的設定檔，請手動選擇。</string>
+    <string name="translation_config">翻譯設定</string>
+    <string name="config_none">無</string>
+    <string name="config_auto">自動 · %1$s</string>
+    <string name="auto_font">自動尋找字型</string>
+    <string name="choose_font">選擇字型</string>
+    <string name="change_font">更換字型</string>
+    <string name="reset_font">重設字型選擇</string>
+    <string name="selected_font">已選字型：%1$s</string>
+    <string name="custom_font">自訂字型</string>
+    <string name="font_error">無法載入字型。請選擇不超過64 MiB的有效TTF、OTF或TTC檔案。</string>
+    <string name="system_font">系統字型</string>
+    <string name="selected_system_font">系統字型：%1$s</string>
 </resources>

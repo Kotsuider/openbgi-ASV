@@ -98,7 +98,10 @@ int Movie_Play(int32_t* outLength, const char* path, int x, int y, int w, int h)
 		h = m.b - m.t + 1;
 	}
 	if(!OS_MovieStart(x, y, w, h, volume, outLength))
+	{
+		Movie_Stop();
 		return 0;
+	}
 	gMovieLoaded = 1;
 	gMoviePlaying = 1;
 	return 1;
@@ -136,6 +139,10 @@ void Movie_Tick(void)
 {
 	if(gMovieFx && gMoviePlaying && !MovieFx_Tick())
 		Movie_OnEvent(1);
+#if defined(BGI_ANDROID)
+	else if(!gMovieFx && gMoviePlaying && !OS_MovieIsRunning())
+		Movie_OnEvent(1);
+#endif
 }
 
 /* the WM_APP notification of the main window: the OS layer has drained

@@ -168,6 +168,32 @@ void WasmJs_FillBlack(void)
 	(*env)->CallVoidMethod(env, activity, METHOD("fillBlack", "()V"));
 }
 
+int Android_MovieFileOpen(const char* path)
+{
+	char relative[0x800];
+	OsWasm_RelPath(path, relative, sizeof relative);
+	jstring name = (*env)->NewStringUTF(env, relative);
+	if(!name) return -1;
+	int fd = (*env)->CallIntMethod(env, activity, METHOD("documentOpen", "(Ljava/lang/String;)I"), name);
+	(*env)->DeleteLocalRef(env, name);
+	return fd;
+}
+
+int Android_MovieOpen(const char* path)
+{
+	jstring name = (*env)->NewStringUTF(env, path);
+	int result = (*env)->CallBooleanMethod(env, activity, METHOD("movieOpen", "(Ljava/lang/String;)Z"), name);
+	(*env)->DeleteLocalRef(env, name);
+	if(result) HostLog(ANDROID_LOG_INFO, "Android MediaPlayer opened %s", path);
+	return result;
+}
+int Android_MovieStart(int x, int y, int w, int h, int volume) {
+	return (*env)->CallIntMethod(env, activity, METHOD("movieStart", "(IIIII)I"), x, y, w, h, volume);
+}
+void Android_MovieStop(void) { (*env)->CallVoidMethod(env, activity, METHOD("movieStop", "()V")); }
+int Android_MovieRunning(void) { return (*env)->CallBooleanMethod(env, activity, METHOD("movieRunning", "()Z")); }
+void Android_MovieVolume(int volume) { (*env)->CallVoidMethod(env, activity, METHOD("movieVolume", "(I)V"), volume); }
+
 int WasmJs_FontAddFile(const char* path)
 {
 	jstring name = (*env)->NewStringUTF(env, path);
@@ -192,6 +218,11 @@ int WasmJs_FontOpen(const char* face, int height, int width, int bold, int itali
 	if(family)
 		(*env)->DeleteLocalRef(env, family);
 	return id;
+}
+
+int WasmJs_FontDecode(int value, int codepage)
+{
+	return (*env)->CallIntMethod(env, activity, METHOD("fontDecode", "(II)I"), value, codepage);
 }
 
 int WasmJs_FontAdvance(int id, int cp)

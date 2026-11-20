@@ -36,4 +36,16 @@
     <string name="game_unreadable">Cannot read this game. Add its folder again to restore access.</string>
     <string name="choose_profile">Select profile</string>
     <string name="no_matching_profile">No matching profile. Select one manually.</string>
+    <string name="translation_config">Translation configuration</string>
+    <string name="config_none">None</string>
+    <string name="config_auto">Automatic · %1$s</string>
+    <string name="auto_font">Find a font automatically</string>
+    <string name="choose_font">Choose font</string>
+    <string name="change_font">Change font</string>
+    <string name="reset_font">Reset font selection</string>
+    <string name="selected_font">Selected font: %1$s</string>
+    <string name="custom_font">Custom font</string>
+    <string name="font_error">Could not load the font. Choose a valid TTF, OTF or TTC file up to 64 MiB.</string>
+    <string name="system_font">System font</string>
+    <string name="selected_system_font">System font: %1$s</string>
 </resources>

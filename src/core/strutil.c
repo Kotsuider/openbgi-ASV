@@ -14,6 +14,50 @@
 #include "bgi/strutil.h"
 #include "bgi/os.h"
 
+static uint32_t gCharRemap[64][2];
+static int gCharRemapCount;
+
+int Text_SetCharRemap(const char* pairs)
+{
+	uint32_t table[64][2];
+	int count = 0, i, side;
+	const char* p = pairs;
+	while(*p)
+	{
+		if(count == 64) return 0;
+		for(side = 0; side < 2; side++)
+		{
+			uint32_t value = 0;
+			int digits = 0;
+			while((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f') || (*p >= 'A' && *p <= 'F'))
+			{
+				int digit = *p <= '9' ? *p - '0' : (*p | 32) - 'a' + 10;
+				if(++digits > 6) return 0;
+				value = value * 16 + digit;
+				p++;
+			}
+			if(!digits || value > 0x10ffff || (value >= 0xd800 && value <= 0xdfff)) return 0;
+			table[count][side] = value;
+			if(side == 0 && *p++ != ':') return 0;
+		}
+		for(i = 0; i < count; i++)
+			if(table[i][0] == table[count][0]) return 0;
+		count++;
+		if(*p && (*p++ != ',' || !*p)) return 0;
+	}
+	memcpy(gCharRemap, table, count * sizeof table[0]);
+	gCharRemapCount = count;
+	return 1;
+}
+
+uint32_t Text_RemapUnicode(uint32_t code)
+{
+	int i;
+	for(i = 0; i < gCharRemapCount; i++)
+		if(gCharRemap[i][0] == code) return gCharRemap[i][1];
+	return code;
+}
+
 // 1 for the first byte of a double-byte Shift-JIS character (0x80 .. 0x9F, 0xE0 .. 0xFF)
 int SjisIsLead(uint8_t c)
 {

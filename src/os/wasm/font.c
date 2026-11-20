@@ -24,6 +24,7 @@
  */
 #include "bgi/os.h"
 #include "bgi/os_common.h"
+#include "bgi/strutil.h"
 #include "bgi/os_wasm.h"
 
 #include <emscripten/emscripten.h>
@@ -208,7 +209,16 @@ void OS_FontClose(OsFont_t* f)
 // the code point of a `len`-byte character in the text encoding (Shift-JIS or UTF-8)
 static uint32_t CodePoint(const char* sjis, int len)
 {
-	return OsCommon_CodePoint(sjis, len, OsWasm_SjisChar);
+	uint32_t cp = OsCommon_CodePoint(sjis, len, OsWasm_SjisChar);
+#if defined(BGI_ANDROID)
+	const char* page = getenv("OPENBGI_FONT_CODEPAGE");
+	if(!gOsTextUtf8 && len == 1 && page && *page)
+	{
+		extern int WasmJs_FontDecode(int value, int codepage);
+		cp = (uint32_t)WasmJs_FontDecode((uint8_t)sjis[0], atoi(page));
+	}
+#endif
+	return Text_RemapUnicode(cp);
 }
 
 // clear the w x h cell of the 8-bit buffer, then draw (NULL font: a blank cell)

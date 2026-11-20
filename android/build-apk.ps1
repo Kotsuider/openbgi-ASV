@@ -37,7 +37,7 @@ if (!(Test-Path -LiteralPath $vorbis)) {
     Move-Item -LiteralPath $download -Destination $vorbis
 }
 
-Run $cmake -S $source -B $build -G Ninja "-DCMAKE_MAKE_PROGRAM=$ninja" "-DCMAKE_TOOLCHAIN_FILE=$toolchain" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-28 -DBGI_ANDROID_APP=ON
+Run $cmake -S $source -B $build -G Ninja "-DCMAKE_MAKE_PROGRAM=$ninja" "-DCMAKE_TOOLCHAIN_FILE=$toolchain" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-28 -DBGI_ANDROID_APP=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
 Run $cmake --build $build --parallel 8
 
 $lib = Join-Path $build 'package/lib/arm64-v8a'

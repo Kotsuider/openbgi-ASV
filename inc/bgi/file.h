@@ -178,6 +178,10 @@ void Loader_QueueSe(uint32_t* status, int slot, const void* desc, int fadeInMs, 
 void Loader_Start(void);
 void Loader_Stop(void);
 
+// Optional loose-resource overrides, resolved against gBaseDir at read time.
+int File_SetPatchDir(const char* dir); // empty disables; 0 if too long
+int File_PatchPath(char* dst, size_t capacity, const char* name); // existing file only
+
 // ---- loading ----------------------------------------------------------
 /* buf receives the whole file, decompressed when it is DSC or
  * CompressedBG.  Returns the size in buf.  Prompts for the disc while the

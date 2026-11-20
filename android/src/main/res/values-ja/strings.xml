@@ -36,4 +36,16 @@
     <string name="game_unreadable">ゲームを読み込めません。フォルダーをもう一度追加してください。</string>
     <string name="choose_profile">プロファイルを選択</string>
     <string name="no_matching_profile">対応するプロファイルが見つかりません。手動で選択してください。</string>
+    <string name="translation_config">翻訳設定</string>
+    <string name="config_none">なし</string>
+    <string name="config_auto">自動 · %1$s</string>
+    <string name="auto_font">フォントを自動検索</string>
+    <string name="choose_font">フォントを選択</string>
+    <string name="change_font">フォントを変更</string>
+    <string name="reset_font">フォント選択をリセット</string>
+    <string name="selected_font">選択したフォント: %1$s</string>
+    <string name="custom_font">カスタムフォント</string>
+    <string name="font_error">フォントを読み込めません。64 MiB以下の有効なTTF、OTF、TTCファイルを選択してください。</string>
+    <string name="system_font">システムフォント</string>
+    <string name="selected_system_font">システムフォント: %1$s</string>
 </resources>

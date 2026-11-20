@@ -32,8 +32,10 @@
 #include "bgi/error.h"
 #include "bgi/msg.h"
 #include "bgi/os.h"
+#include "bgi/strutil.h"
 #include "bgi/json.h"
 #include "bgi/gfx/text.h"
+#include "bgi/gfx/font.h"
 
 int gLauncherMode;                       // "Execute as a launcher.": no sound, no saved window position
 int gNoMutex;                            // "Do not use mutex.": several instances may run
@@ -334,6 +336,7 @@ static int gOptExtractMode;     // EXTRACT_DECODE / RAW / CONVERT
 static int gOptDebug;           // --debug: 1 open the debugger, 2 open it paused
 static int gOptLetterSpacing;
 static char gOptFontFile[0x400];
+static int gOptNoAutoFont, gOptAutoFontSet;
 static int gOptLauncher;       // --launcher: show the game picker even inside a game folder
 
 static void Engine_FontOption(const char* name, const char* value)
@@ -402,18 +405,53 @@ static void Engine_ParseOptions(char* cmd)
 			Engine_FontOption("OPENBGI_FONT_FACE", opt + 12);
 		else if(strncmp(opt, "--font-file=", 12) == 0)
 			snprintf(gOptFontFile, sizeof gOptFontFile, "%s", opt + 12);
+		else if(strcmp(opt, "--no-auto-font") == 0 || strcmp(opt, "--auto-font=0") == 0)
+		{
+			gOptNoAutoFont = 1;
+			gOptAutoFontSet = 1;
+		}
+		else if(strcmp(opt, "--auto-font") == 0 || strcmp(opt, "--auto-font=1") == 0)
+		{
+			gOptNoAutoFont = 0;
+			gOptAutoFontSet = 1;
+		}
+		else if(strncmp(opt, "--patch-dir=", 12) == 0)
+		{
+			if(!File_SetPatchDir(opt + 12))
+				fprintf(stderr, "bgi: patch directory is too long\n");
+			else
+				fprintf(stderr, "bgi: patch directory %s\n", opt + 12);
+		}
+		else if(strncmp(opt, "--char-remap=", 13) == 0)
+		{
+			if(!Text_SetCharRemap(opt + 13))
+				fprintf(stderr, "bgi: invalid character remap (expected HEX:HEX pairs, maximum 64, unique sources)\n");
+			else
+				fprintf(stderr, "bgi: character remap %s\n", opt + 13);
+		}
+		else if(strncmp(opt, "--font-codepage=", 16) == 0)
+		{
+			char* end;
+			long page = strtol(opt + 16, &end, 10);
+			if(end != opt + 16 && !*end && page >= 1 && page <= 65535)
+				Engine_FontOption("OPENBGI_FONT_CODEPAGE", opt + 16);
+			else
+				fprintf(stderr, "bgi: invalid font code page (expected integer 1..65535)\n");
+		}
 		else if(strncmp(opt, "--font-size=", 12) == 0 ||
+			strncmp(opt, "--font-charset=", 15) == 0 ||
 			strncmp(opt, "--font-width=", 13) == 0 || strncmp(opt, "--font-weight=", 14) == 0)
 		{
 			int width = strncmp(opt, "--font-width=", 13) == 0;
 			int weight = strncmp(opt, "--font-weight=", 14) == 0;
-			const char* value = opt + (width ? 13 : weight ? 14 : 12);
+			int charset = strncmp(opt, "--font-charset=", 15) == 0;
+			const char* value = opt + (charset ? 15 : width ? 13 : weight ? 14 : 12);
 			char* end;
 			long number = strtol(value, &end, 10);
-			int min = width ? 0 : weight ? 1 : 4;
-			int max = weight ? 1000 : 200;
+			int min = width || charset ? 0 : weight ? 1 : 4;
+			int max = charset ? 255 : weight ? 1000 : 200;
 			if(end != value && !*end && number >= min && number <= max)
-				Engine_FontOption(width ? "OPENBGI_FONT_WIDTH" :
+				Engine_FontOption(charset ? "OPENBGI_FONT_CHARSET" : width ? "OPENBGI_FONT_WIDTH" :
 					weight ? "OPENBGI_FONT_WEIGHT" : "OPENBGI_FONT_SIZE", value);
 			else
 				fprintf(stderr, "bgi: invalid font option %s (expected integer %d..%d)\n", opt, min, max);
@@ -469,8 +507,6 @@ static void Engine_LoadTextConfig(void)
 	char* data;
 	JsonNode_t* root;
 	const JsonNode_t* spacing;
-	if(gOptLetterSpacing)
-		return;
 	OS_GameDir(path, sizeof path);
 	strncat(path, "OBAConfig.json", sizeof path - strlen(path) - 1);
 	file = OS_FileOpenRead(path);
@@ -494,7 +530,7 @@ static void Engine_LoadTextConfig(void)
 	root = Json_Parse(data, length, NULL);
 	BGI_Free(data);
 	spacing = Json_Get(root, "letter_spacing");
-	if(spacing && spacing->type == JSON_NUMBER)
+	if(!gOptLetterSpacing && spacing && spacing->type == JSON_NUMBER)
 	{
 		double value = spacing->num;
 		if(value >= -16 && value <= 64 && value == (int)value)
@@ -502,6 +538,9 @@ static void Engine_LoadTextConfig(void)
 		else
 			fprintf(stderr, "bgi: invalid letter_spacing in OBAConfig.json (expected integer -16..64)\n");
 	}
+	const JsonNode_t* automaticFont = Json_Get(root, "auto_font");
+	if(!gOptAutoFontSet && automaticFont && automaticFont->type == JSON_BOOL)
+		gOptNoAutoFont = !automaticFont->num;
 	Json_Free(root);
 }
 
@@ -678,8 +717,44 @@ int Engine_Main(const char* cmdLine)
 			return r < 0 ? 1 : 0;
 	}
 	Engine_LoadTextConfig();
-	if(gOptFontFile[0] && !OS_FontAddFile(gOptFontFile))
-		fprintf(stderr, "bgi: cannot load font file %s\n", gOptFontFile);
+	if(gOptFontFile[0])
+	{
+		const char* fontPath = gOptFontFile;
+#if defined(BGI_WIN32)
+		char path[0x800], directory[0x408];
+		if(gOptFontFile[0] != '/' && gOptFontFile[0] != '\\' && gOptFontFile[1] != ':')
+		{
+			OS_GameDir(directory, sizeof directory);
+			if(snprintf(path, sizeof path, "%s%s", directory, gOptFontFile) >= (int)sizeof path)
+				return 1;
+			fontPath = path;
+		}
+#endif
+		if(OS_FontAddFile(fontPath))
+		{
+			fprintf(stderr, "bgi: loaded font file %s\n", gOptFontFile);
+#if defined(BGI_WIN32)
+			if(!getenv("OPENBGI_FONT_FACE") || !*getenv("OPENBGI_FONT_FACE"))
+			{
+				char family[256], native[256];
+				if(FontFile_Family(fontPath, family, sizeof family))
+				{
+					OS_Utf8ToSjis(family, native, sizeof native);
+					Engine_FontOption("OPENBGI_FONT_FACE", native);
+				}
+			}
+#endif
+		}
+		else
+			fprintf(stderr, "bgi: cannot load font file %s\n", gOptFontFile);
+	}
+	if(!gOptFontFile[0] && !gOptNoAutoFont && (!getenv("OPENBGI_FONT_FACE") || !*getenv("OPENBGI_FONT_FACE")))
+	{
+		char directory[0x408], chosen[0x408];
+		OS_GameDir(directory, sizeof directory);
+		if(FontFile_AutoLoad(directory, chosen, sizeof chosen))
+			fprintf(stderr, "bgi: automatically selected font %s\n", chosen);
+	}
 	if(gTextLetterSpacing)
 		fprintf(stderr, "bgi: letter spacing %+d px\n", (int)gTextLetterSpacing);
 	if(!gNoMutex)

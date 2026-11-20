@@ -25,6 +25,7 @@
 
 #include "bgi/os.h"
 #include "bgi/os_common.h"
+#include "bgi/strutil.h"
 
 struct OsFont
 {
@@ -233,11 +234,25 @@ int OS_FontAddMemory(const void* data, uint32_t size)
  * FW_BOLD, italic, 0, 0, SHIFTJIS_CHARSET, OUT_TT_PRECIS, 0, PROOF_QUALITY,
  * FIXED_PITCH, face) over an 8-bit DIB; NULL when the font cannot be
  * created. */
+static int FontCharset(void)
+{
+	const char* value = getenv("OPENBGI_FONT_CHARSET");
+	if(value && *value)
+	{
+		char* end;
+		long charset = strtol(value, &end, 10);
+		if(end != value && !*end && charset >= 0 && charset <= 255)
+			return (int)charset;
+	}
+	return SHIFTJIS_CHARSET;
+}
+
 OsFont_t* OS_FontOpen(const char* face, int height, int width, int bold, int italic)
 {
 	WCHAR wface[0x100];
 	HFONT font;
 	int weight = bold ? FW_BOLD : FW_THIN;
+	int charset = FontCharset();
 	const char* overrideWeight = getenv("OPENBGI_FONT_WEIGHT");
 	if(overrideWeight && *overrideWeight)
 	{
@@ -247,7 +262,7 @@ OsFont_t* OS_FontOpen(const char* face, int height, int width, int bold, int ita
 			weight = (int)value;
 	}
 	Win32_ToWide(face, wface, (int)BGI_COUNTOF(wface));
-	font = CreateFontW(height, width, 0, 0, weight, italic ? 1 : 0, 0, 0, SHIFTJIS_CHARSET,
+	font = CreateFontW(height, width, 0, 0, weight, italic ? 1 : 0, 0, 0, charset,
 		OUT_TT_PRECIS, 0, PROOF_QUALITY, FIXED_PITCH, wface);
 	return FontNew(font, 8);
 }
@@ -259,8 +274,14 @@ OsFont_t* OS_FontOpenMono(const char* face, int size, int bold)
 {
 	WCHAR wface[0x100];
 	HFONT font;
+	const char* overrideFace = getenv("OPENBGI_FONT_FACE");
+	int charset = FontCharset();
+	if(overrideFace && *overrideFace)
+	{
+		face = overrideFace;
+	}
 	Win32_ToWide(face, wface, (int)BGI_COUNTOF(wface));
-	font = CreateFontW(size, size / 2, 0, 0, bold ? FW_BOLD : FW_NORMAL, 0, 0, 0, SHIFTJIS_CHARSET,
+	font = CreateFontW(size, size / 2, 0, 0, bold ? FW_BOLD : FW_NORMAL, 0, 0, 0, charset,
 		OUT_DEFAULT_PRECIS, 0, DRAFT_QUALITY, FIXED_PITCH | FF_ROMAN, wface);
 	return FontNew(font, 1);
 }
@@ -292,26 +313,34 @@ void OS_FontClose(OsFont_t* f)
  * above U+FFFF). */
 static int FontCharWide(const char* sjis, int len, WCHAR* wide)
 {
-	int wn;
+	uint32_t cp;
 	if(gOsTextUtf8)
+		cp = OsCommon_CodePoint(sjis, len, NULL);
+	else
 	{
-		uint32_t cp = OsCommon_CodePoint(sjis, len, NULL);
-		if(cp >= 0x10000)
+		UINT codepage = WIN32_CP_SJIS;
+		const char* overrideCodepage = getenv("OPENBGI_FONT_CODEPAGE");
+		if(len == 1 && overrideCodepage && *overrideCodepage)
 		{
-			wide[0] = (WCHAR)(0xd800 + ((cp - 0x10000) >> 10));
-			wide[1] = (WCHAR)(0xdc00 + ((cp - 0x10000) & 0x3ff));
-			return 2;
+			char* end;
+			long page = strtol(overrideCodepage, &end, 10);
+			if(end != overrideCodepage && !*end && page >= 1 && page <= 65535 && IsValidCodePage((UINT)page))
+				codepage = (UINT)page;
 		}
-		wide[0] = (WCHAR)cp;
-		return 1;
+		int wn = MultiByteToWideChar(codepage, 0, sjis, len, wide, 2);
+		cp = wn > 0 ? wide[0] : (len > 0 ? (uint8_t)sjis[0] : ' ');
+		if(wn == 2 && wide[0] >= 0xd800 && wide[0] <= 0xdbff && wide[1] >= 0xdc00 && wide[1] <= 0xdfff)
+			cp = 0x10000 + ((wide[0] - 0xd800) << 10) + wide[1] - 0xdc00;
 	}
-	wn = MultiByteToWideChar(WIN32_CP_SJIS, 0, sjis, len, wide, 2);
-	if(wn <= 0)
-	{ // an empty or over-long character, or no code page 932: the first byte as it is
-		wide[0] = (WCHAR)(len > 0 ? (uint8_t)sjis[0] : ' ');
-		wn = 1;
+	cp = Text_RemapUnicode(cp);
+	if(cp >= 0x10000)
+	{
+		wide[0] = (WCHAR)(0xd800 + ((cp - 0x10000) >> 10));
+		wide[1] = (WCHAR)(0xdc00 + ((cp - 0x10000) & 0x3ff));
+		return 2;
 	}
-	return wn;
+	wide[0] = (WCHAR)cp;
+	return 1;
 }
 
 /* Clear the DIB and draw the character at its top-left corner with

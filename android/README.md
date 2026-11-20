@@ -162,3 +162,121 @@ the spacing when the arguments do not contain `--letter-spacing`.
 Explicit arguments take precedence. Letter spacing affects horizontal
 text, including bidirectional text. Vertical text and ruby readings use
 their existing spacing.
+
+## Translation configuration presets
+
+Long-press a library card, or tap the engine profile in Folders, to open
+game settings. **Translation configuration** offers automatic detection,
+any supported UIF JSON found in that game folder, `OBAConfig.json`, the
+bundled presets, and None. Automatic selection prioritizes UIF, then the
+local OBA configuration, then a preset matched against the folder name.
+Manual selection is stored per game. Custom arguments override the
+selected configuration's argument string.
+
+Edit `src/main/assets/game-configs.json` to add a bundled preset:
+
+```json
+{
+  "version": 1,
+  "configs": [
+    {
+      "id": "my-translation",
+      "name": "My game — translation",
+      "match": ["My game", "Alternative title"],
+      "engine": "1.616",
+      "arguments": "--font-file=repair/MyFont.ttf --font-width=0",
+      "auto_font": true
+    }
+  ]
+}
+```
+
+The match aliases are compared to the selected folder name, ignoring case
+and punctuation. Keep aliases specific to the intended game and edition.
+Fonts and game resources are supplied separately; they are not in the APK.
+
+**Find a font automatically** searches the root folder first, then
+subfolders. A font explicitly specified by the selected configuration,
+UIF, or command line takes priority. Disable the switch to retain the
+engine's normal font selection. This setting is stored in the app's
+private per-game preferences. The native options `--auto-font` and
+`--no-auto-font` are also available. Android supports `--font-codepage`
+for the single-byte glyph conversion used by custom translation fonts,
+including code page 1252 used by the Sakura no Uta preset. Script parsing
+and double-byte CP932 characters keep their existing encoding.
+
+### A font selected on the device
+
+In game settings, use **Choose font** to select a `.ttf`, `.otf` or `.ttc`
+file through the system picker (maximum 64 MiB; first face for TTC).
+A validated private copy is stored under the app's `files/fonts/` folder,
+keyed by the game folder URI. The original file can then be removed.
+The selected filename is shown in settings. **Reset font selection**
+removes that game's private copy and restores normal font selection.
+This setting applies to the next launch as soon as the file is imported.
+Removing a game from the library also removes its private font copy.
+
+The priority is **manually selected font → configured/command-line font →
+UIF font → automatic discovery → engine defaults**. A manual font also
+works when automatic discovery is disabled. Font weight, size, character
+encoding and remapping still follow the existing launch settings.
+
+**System font** selects a named Android font family directly, without a
+file picker or a copy of a system font. The list previews each family and
+includes the standard `sans-serif`, `serif`, and `monospace` families.
+Additional named families and aliases are read from accessible system and
+vendor font XML files. The list therefore varies by Android version and
+firmware. The family is saved per game, with the same highest priority as
+an imported font file. Selecting a family replaces the active manual file
+choice, and importing a file switches back to that file. **Reset font
+selection** clears both choices and deletes any retained private font copy.
+
+## Video playback
+
+The `90 F0` movie player uses Android MediaPlayer for supported platform
+formats, including H.264/AAC MP4. The video surface follows the game image
+rectangle and stays below the game controls. Files are opened through the
+selected folder grant. H2O stores MP4 movies under names such as
+`data00500.arc`; their contents determine the format, so renaming or
+extracting them is unnecessary.
+
+MPEG-1/MP2 program streams, including Suika A.S+'s `Movie/opening.mpg`,
+use the embedded PL_MPEG decoder. It reads incrementally, displays decoded
+frames through OpenBGI, and sends PCM through the engine mixer. Movie
+volume, script stop/skip and completion use the existing movie interface.
+Neither `ffmpeg` nor `ffprobe` is required for these Android playback paths.
+
+The separate archive-entry movie command and video textures remain
+unsupported. BF_Movie bitmap sequences keep their existing decoder.
+
+Native APK builds default to `RelWithDebInfo` (`-O2`). MPEG playback keeps
+the selected document descriptor open for the duration of the movie and
+uses precomputed horizontal scaling coordinates. Catch-up decoding converts
+only the most recent frame to BGRA. Every five seconds the launch log
+reports displayed FPS and decode/output timing; these measure the engine
+path and do not include the Android compositor latency.
+
+### Playback diagnostics
+
+Open **Logs** after a launch and look for the selected player:
+
+```text
+bgi: PL_MPEG C:\Movie\opening.mpg (640x480, 30.000 fps, 44100 Hz, 132899 ms)
+bgi: MPEG performance: 30.0 fps shown, decode 1.47 ms/frame, output 2.78 ms/frame, worst tick 5.76 ms
+```
+
+MP4 playback reports `Android MediaPlayer opened` followed by the movie
+path. The `.arc` suffix of H2O's standalone movie does not require an
+archive decoder. The examined `data00500.arc` is byte-for-byte identical
+to the supplied `1data00500.mp4` example: H.264/AAC MP4 at 800×600.
+
+The timing line above is an example recorded on the test phone during a
+Suika opening segment. At 30 fps the frame interval is approximately
+33.3 ms. Decode/output timing covers the engine path; it does not measure
+final on-screen presentation or guarantee smooth playback on every device.
+
+For a decoder regression check on a desktop build, run `bin/test_mpeg`
+with `BGI_MPEG_FILE` pointing to an MPEG-1/MP2 fixture, or pass its path as
+the first argument. It checks decoding of four seconds of video/audio.
+Without a fixture, the malformed-input check runs and the media check is
+reported as skipped. No game video is bundled with the tests or APK.
