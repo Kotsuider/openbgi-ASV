@@ -6,7 +6,8 @@
  *
  * Interface: waitobj.h (the constructors).
  *
- *   WaitLoader     base: a file read by the loader thread into a 32 MB buffer
+ *   WaitLoader     base: a file read by the loader thread into a buffer of
+ *                  the build's load limit (LoadFile_BufferSize: 32 .. 64 MB)
  *   WaitBmpLoad    "90 10": the file becomes a bitmap slot; pushes nothing
  *   WaitSeLoad     "A0 20" / "A0 21": the file becomes a sound effect slot;
  *                  pushes nothing
@@ -14,6 +15,9 @@
  *                  sequence record; pushes 0 ok / 1 / 2 not a movie
  *   WaitSeqDecode  "90 F6" after "80 53": the frame is decoded on the next
  *                  pass instead of at once; pushes 0 / 3 / 5 / 8
+ *   WaitSeqOpen    "92 F1" with its flag set: a streamed BF_Movie becomes a
+ *                  record that reads its frames from the file; pushes 0 / 1
+ *                  / 2 (not a WaitLoader: the file is not loaded)
  *
  * The constructor lower-cases both names, consults the file cache when the
  * caller allows it and queues the read; poll() waits for the loader's status
@@ -30,11 +34,13 @@
 #include "bgi/strutil.h"
 #include "bgi/gfx/bmpops.h"
 #include "bgi/gfx/bmseq.h"
+#include "bgi/bfmovie.h"
+#include "bgi/core.h"
 
 typedef struct WaitLoader // 0x238 bytes
 {
 	Wait_t w;         // (WaitCounted)
-	uint8_t* buf;     // 32 MB file buffer
+	uint8_t* buf;     // the file buffer (LoadFile_BufferSize bytes)
 	char arc[0x104];  // lower-cased archive name ("" for none)
 	char name[0x104]; // lower-cased file name
 	uint32_t status;  // loader status: 0 pending, -1 failed, else the size in bytes
@@ -62,7 +68,7 @@ typedef struct WaitSeLoad // 0x250 bytes
 typedef struct LoaderVtbl
 {
 	WaitVtbl_t base;
-	int (*finish)(WaitLoader_t* w); // the loaded data is in buf; 1 when the wait is over
+	int (*finish)(OpenBGI_t* o, WaitLoader_t* w); // the loaded data is in buf; 1 when the wait is over
 } LoaderVtbl_t;
 
 // the archive argument of the file functions: "0" means a loose file
@@ -72,109 +78,110 @@ typedef struct LoaderVtbl
  * either satisfy the read from the file cache (useCache, and the cache
  * exists) or queue it with the loader thread.  A NULL name is a script
  * error, which does not return. */
-static void WaitLoader_Ctor(WaitLoader_t* w, Thread_t* t, const char* arc, const char* name, int useCache)
+static void WaitLoader_Ctor(OpenBGI_t* o, WaitLoader_t* w, Thread_t* t, const char* arc, const char* name, int useCache)
 {
-	WaitCounted_Ctor(&w->w, t);
+	WaitCounted_Ctor(o, &w->w, t);
 	if(!name)
 	{
 		w->buf = NULL;
-		ScriptError(MSG_LOAD_NULL_NAME, t);
+		ScriptError(o, MSG_LOAD_NULL_NAME, t);
 	}
-	WaitCount_Inc();
+	WaitCount_Inc(o);
 	if(arc)
 	{
 		strcpy(w->arc, arc);
-		SjisStrLwr(w->arc);
+		SjisStrLwr(o, w->arc);
 	}
 	else
 		w->arc[0] = 0;
 	strcpy(w->name, name);
-	SjisStrLwr(w->name);
-	w->useCache = useCache && gFileCache != NULL;
-	w->buf = (uint8_t*)BGI_Alloc(LoadFile_BufferSize());
+	SjisStrLwr(o, w->name);
+	w->useCache = useCache && o->files.fileCache != NULL;
+	w->buf = (uint8_t*)BGI_Alloc(LoadFile_BufferSize(o));
 	if(w->useCache)
 	{
-		w->cacheHit = FileCache_Lookup(gFileCache, w->buf, &w->status, ARC_ARG(w), w->name) != 0;
+		w->cacheHit = FileCache_Lookup(o, o->files.fileCache, w->buf, &w->status, ARC_ARG(w), w->name) != 0;
 		if(w->cacheHit)
 			return;
 	}
-	Loader_QueueFile(&w->status, w->buf, ARC_ARG(w), w->name);
+	Loader_QueueFile(o, &w->status, w->buf, ARC_ARG(w), w->name);
 }
 
-static void WaitLoader_Dtor(WaitLoader_t* w)
+static void WaitLoader_Dtor(OpenBGI_t* o, WaitLoader_t* w)
 {
+	Loader_Cancel(o, &w->status); // a job still waiting for its disc
 	BGI_Free(w->buf);
-	WaitCount_Dec();
-	WaitCounted_Dtor(&w->w);
+	WaitCount_Dec(o);
+	WaitCounted_Dtor(o, &w->w);
 }
 
 /* the shared poll: 0 while the loader has not written the status, -1 (the
  * machine stops) when the read failed, else the file goes into the cache
  * (when it was not from there) and the subclass's finish decides whether
  * the wait is over */
-static int WaitLoader_Poll(Wait_t* base)
+static int WaitLoader_Poll(OpenBGI_t* o, Wait_t* base)
 {
 	WaitLoader_t* w = (WaitLoader_t*)base;
 	if(!w->buf)
 		return -1;
-	Wait_Tick(base);
+	Wait_Tick(o, base);
 	if(w->status == 0)
 		return 0;
 	if(w->status == 0xffffffffu)
 		return -1;
 	if(w->useCache && !w->cacheHit)
-		FileCache_Add(gFileCache, ARC_ARG(w), w->name, w->buf, w->status);
-	return ((const LoaderVtbl_t*)base->vt)->finish(w) != 0;
+		FileCache_Add(o, o->files.fileCache, ARC_ARG(w), w->name, w->buf, w->status);
+	return ((const LoaderVtbl_t*)base->vt)->finish(o, w) != 0;
 }
 
 // ---- bitmaps ---------------------------------------------------------------
 
-static void WaitBmpLoad_Destroy(Wait_t* base)
+static void WaitBmpLoad_Destroy(OpenBGI_t* o, Wait_t* base)
 {
-	WaitLoader_Dtor((WaitLoader_t*)base);
+	WaitLoader_Dtor(o, (WaitLoader_t*)base);
 	BGI_Free(base);
 }
 
 /* decode a Windows BMP into the slot; a file that is not one goes through
  * the engine's own image format instead.  Every decoder error but "the
  * manager refused" is a script error naming the file.  Always finishes. */
-static int WaitBmpLoad_Finish(WaitLoader_t* l)
+static int WaitBmpLoad_Finish(OpenBGI_t* o, WaitLoader_t* l)
 {
 	WaitBmpLoad_t* w = (WaitBmpLoad_t*)l;
 	Thread_t* t = l->w.thread;
 	char msg[0x100];
-	switch(BmpOp_DecodeBmp(w->bmpNo, l->buf))
+	switch(BmpOp_DecodeBmp(o, w->bmpNo, l->buf))
 	{
 		case(int)0x80000001: // not a BMP
-			switch(BmpOp_PutRaw(w->bmpNo, l->buf))
+			switch(BmpOp_PutRaw(o, w->bmpNo, l->buf))
 			{
 				case 1: // not the engine's format either
 					sprintf(msg, MSG_BMP_NOT_BG, l->arc, l->name);
-					ScriptError(msg, t);
+					ScriptError(o, msg, t);
 					break;
-				case 2: ScriptError(MSG_BMP_NO_MEMORY, t); break;
+				case 2: ScriptError(o, MSG_BMP_NO_MEMORY, t); break;
 				default: break;
 			}
 			break;
 		case(int)0x80000002:
 			sprintf(msg, MSG_BMP_NOT_WINDOWS, l->arc, l->name);
-			ScriptError(msg, t);
+			ScriptError(o, msg, t);
 			break;
 		case(int)0x80000003:
 			sprintf(msg, MSG_BMP_BAD_PLANES, l->arc, l->name);
-			ScriptError(msg, t);
+			ScriptError(o, msg, t);
 			break;
 		case(int)0x80000004:
 			sprintf(msg, MSG_BMP_BAD_BITCOUNT2, l->arc, l->name);
-			ScriptError(msg, t);
+			ScriptError(o, msg, t);
 			break;
 		case(int)0x80000005:
 			sprintf(msg, MSG_BMP_COMPRESSED, l->arc, l->name);
-			ScriptError(msg, t);
+			ScriptError(o, msg, t);
 			break;
 		case(int)0x80000006:
 			sprintf(msg, MSG_BMP_BAD_SIZE, l->arc, l->name);
-			ScriptError(msg, t);
+			ScriptError(o, msg, t);
 			break;
 		default: break; // 0 and 0x80000007 (the manager refused) pass silently
 	}
@@ -185,10 +192,10 @@ static const LoaderVtbl_t WaitBmpLoad_Vtbl = {
 	{WaitBmpLoad_Destroy, WaitLoader_Poll, Wait_SetTimer, Wait_IsDirtyBase, Wait_OnMessage}, WaitBmpLoad_Finish};
 
 // load file `name` of archive `arc` ("0" = loose file) into bitmap slot bmpNo ("90 10"); uses the file cache
-Wait_t* WaitBmpLoad_New(Thread_t* t, int bmpNo, const char* arc, const char* name)
+Wait_t* WaitBmpLoad_New(OpenBGI_t* o, Thread_t* t, int bmpNo, const char* arc, const char* name)
 {
 	WaitBmpLoad_t* w = (WaitBmpLoad_t*)BGI_Alloc(sizeof *w);
-	WaitLoader_Ctor(&w->l, t, arc, name, 1);
+	WaitLoader_Ctor(o, &w->l, t, arc, name, 1);
 	w->l.w.vt = &WaitBmpLoad_Vtbl.base;
 	w->bmpNo = bmpNo;
 	return &w->l.w;
@@ -196,23 +203,23 @@ Wait_t* WaitBmpLoad_New(Thread_t* t, int bmpNo, const char* arc, const char* nam
 
 // ---- sound effects ---------------------------------------------------------
 
-static void WaitSeLoad_Destroy(Wait_t* base)
+static void WaitSeLoad_Destroy(OpenBGI_t* o, Wait_t* base)
 {
-	WaitLoader_Dtor((WaitLoader_t*)base);
+	WaitLoader_Dtor(o, (WaitLoader_t*)base);
 	BGI_Free(base);
 }
 
 /* the first call queues the data with the sound loader; the next ones wait
  * for its status (-1 pending) and report its errors as script errors (not
  * a BW file, not mono, the registration failed) */
-static int WaitSeLoad_Finish(WaitLoader_t* l)
+static int WaitSeLoad_Finish(OpenBGI_t* o, WaitLoader_t* l)
 {
 	WaitSeLoad_t* w = (WaitSeLoad_t*)l;
 	Thread_t* t = l->w.thread;
 	char msg[0x100];
 	if(!w->queued)
 	{
-		Loader_QueueSe(&w->status2, w->slot, l->buf, w->fadeInMs, w->gain, w->rate);
+		Loader_QueueSe(o, &w->status2, w->slot, l->buf, w->fadeInMs, w->gain, w->rate);
 		w->queued = 1;
 		return 0;
 	}
@@ -221,15 +228,15 @@ static int WaitSeLoad_Finish(WaitLoader_t* l)
 		case 0xffffffffu: return 0;
 		case 0x80000001u:
 			sprintf(msg, MSG_SE_NOT_BW, l->arc, l->name);
-			ScriptError(msg, t);
+			ScriptError(o, msg, t);
 			break;
 		case 0x80000002u:
 			sprintf(msg, MSG_SE_NOT_MONO, l->arc, l->name);
-			ScriptError(msg, t);
+			ScriptError(o, msg, t);
 			break;
 		case 0x8fffffffu:
 			sprintf(msg, MSG_SE_REGISTER_FATAL, l->arc, l->name);
-			ScriptError(msg, t);
+			ScriptError(o, msg, t);
 			break;
 		default: break;
 	}
@@ -243,10 +250,10 @@ static const LoaderVtbl_t WaitSeLoad_Vtbl = {
  * of fadeInMs ms, a sample gain and a playback rate ("A0 20": 0, 1.0 and
  * 1.0; "A0 21": 1.0 for the rate; "A0 27": all as given).  The file cache
  * is not used for sounds. */
-Wait_t* WaitSeLoad_New(Thread_t* t, int slot, const char* arc, const char* name, int fadeInMs, double gain, double rate)
+Wait_t* WaitSeLoad_New(OpenBGI_t* o, Thread_t* t, int slot, const char* arc, const char* name, int fadeInMs, double gain, double rate)
 {
 	WaitSeLoad_t* w = (WaitSeLoad_t*)BGI_Alloc(sizeof *w);
-	WaitLoader_Ctor(&w->l, t, arc, name, 0);
+	WaitLoader_Ctor(o, &w->l, t, arc, name, 0);
 	w->l.w.vt = &WaitSeLoad_Vtbl.base;
 	w->slot = slot;
 	w->fadeInMs = fadeInMs;
@@ -270,33 +277,33 @@ typedef struct WaitSeMem
 	uint32_t status;  // the sound loader's status: -1 pending, 0 ok, 0x8xxxxxxx error
 } WaitSeMem_t;
 
-static void WaitSeMem_Destroy(Wait_t* base)
+static void WaitSeMem_Destroy(OpenBGI_t* o, Wait_t* base)
 {
-	WaitCount_Dec();
-	WaitCounted_Dtor(base);
+	WaitCount_Dec(o);
+	WaitCounted_Dtor(o, base);
 	BGI_Free(base);
 }
 
 /* the first poll queues the data with the sound loader; the next ones wait
  * for its status and report its errors as script errors (the messages
  * name no file: the data came from memory) */
-static int WaitSeMem_Poll(Wait_t* base)
+static int WaitSeMem_Poll(OpenBGI_t* o, Wait_t* base)
 {
 	WaitSeMem_t* w = (WaitSeMem_t*)base;
 	Thread_t* t = base->thread;
-	Wait_Tick(base);
+	Wait_Tick(o, base);
 	if(!w->queued)
 	{
-		Loader_QueueSe(&w->status, w->slot, w->data, w->fadeInMs, w->gain, w->rate);
+		Loader_QueueSe(o, &w->status, w->slot, w->data, w->fadeInMs, w->gain, w->rate);
 		w->queued = 1;
 		return 0;
 	}
 	switch(w->status)
 	{
 		case 0xffffffffu: return 0;
-		case 0x80000001u: ScriptError(MSG_SE_MEM_NOT_BW, t); break;
-		case 0x80000002u: ScriptError(MSG_SE_MEM_NOT_MONO, t); break;
-		case 0x8fffffffu: ScriptError(MSG_SE_MEM_REGISTER_FATAL, t); break;
+		case 0x80000001u: ScriptError(o, MSG_SE_MEM_NOT_BW, t); break;
+		case 0x80000002u: ScriptError(o, MSG_SE_MEM_NOT_MONO, t); break;
+		case 0x8fffffffu: ScriptError(o, MSG_SE_MEM_REGISTER_FATAL, t); break;
 		default: break;
 	}
 	return 1;
@@ -308,11 +315,11 @@ static const WaitVtbl_t WaitSeMem_Vtbl = {WaitSeMem_Destroy, WaitSeMem_Poll, Wai
 /* load the BW file at `data` (in the script's memory, decoded whole before
  * the wait ends) into effect slot `slot` with a fade-in, a sample gain and
  * a playback rate ("A0 28" of 1.547 on) */
-Wait_t* WaitSeMem_New(Thread_t* t, int slot, const void* data, int fadeInMs, double gain, double rate)
+Wait_t* WaitSeMem_New(OpenBGI_t* o, Thread_t* t, int slot, const void* data, int fadeInMs, double gain, double rate)
 {
 	WaitSeMem_t* w = (WaitSeMem_t*)BGI_Alloc(sizeof *w);
-	WaitCounted_Ctor(&w->w, t);
-	WaitCount_Inc();
+	WaitCounted_Ctor(o, &w->w, t);
+	WaitCount_Inc(o);
 	w->w.vt = &WaitSeMem_Vtbl;
 	w->slot = slot;
 	w->data = data;
@@ -335,19 +342,19 @@ typedef struct WaitSeqLoad // 0x244 bytes
 } WaitSeqLoad_t;
 
 // the result is pushed by the destructor, so a failed read pushes the initial 1 as well
-static void WaitSeqLoad_Destroy(Wait_t* base)
+static void WaitSeqLoad_Destroy(OpenBGI_t* o, Wait_t* base)
 {
 	WaitSeqLoad_t* w = (WaitSeqLoad_t*)base;
 	Thread_Push(base->thread, w->result);
-	WaitLoader_Dtor(&w->l);
+	WaitLoader_Dtor(o, &w->l);
 	BGI_Free(base);
 }
 
 // register the file as a sequence; the registry's 0x8000000n codes become 1, 2 (others 0x80000002)
-static int WaitSeqLoad_Finish(WaitLoader_t* l)
+static int WaitSeqLoad_Finish(OpenBGI_t* o, WaitLoader_t* l)
 {
 	WaitSeqLoad_t* w = (WaitSeqLoad_t*)l;
-	switch(BmSeq_Register(l->buf, l->status, w->outNo, w->info))
+	switch(BmSeq_Register(o, l->buf, l->status, w->outNo, w->info))
 	{
 		case 0: w->result = 0; break;
 		case 0x80000001u: w->result = 1; break;
@@ -363,10 +370,10 @@ static const LoaderVtbl_t WaitSeqLoad_Vtbl = {
 /* load the BF_Movie file `name` of archive `arc` and register it ("90 F4");
  * *outNo receives the sequence number, info its five description words.
  * Uses the file cache. */
-Wait_t* WaitSeqLoad_New(Thread_t* t, const char* arc, const char* name, int32_t* outNo, int32_t* info)
+Wait_t* WaitSeqLoad_New(OpenBGI_t* o, Thread_t* t, const char* arc, const char* name, int32_t* outNo, int32_t* info)
 {
 	WaitSeqLoad_t* w = (WaitSeqLoad_t*)BGI_Alloc(sizeof *w);
-	WaitLoader_Ctor(&w->l, t, arc, name, 1);
+	WaitLoader_Ctor(o, &w->l, t, arc, name, 1);
 	w->l.w.vt = &WaitSeqLoad_Vtbl.base;
 	w->outNo = outNo;
 	w->info = info;
@@ -386,18 +393,18 @@ typedef struct WaitSeqDecode // 0x34 bytes
 	uint32_t frame;  // frame index
 } WaitSeqDecode_t;
 
-static void WaitSeqDecode_Destroy(Wait_t* base)
+static void WaitSeqDecode_Destroy(OpenBGI_t* o, Wait_t* base)
 {
-	WaitCount_Dec();
-	WaitCounted_Dtor(base);
+	WaitCount_Dec(o);
+	WaitCounted_Dtor(o, base);
 	BGI_Free(base);
 }
 
 // decode the frame and push the result; always finishes
-static int WaitSeqDecode_Poll(Wait_t* base)
+static int WaitSeqDecode_Poll(OpenBGI_t* o, Wait_t* base)
 {
 	WaitSeqDecode_t* w = (WaitSeqDecode_t*)base;
-	switch(BmSeq_Decode(w->bmpNo, w->no, w->frame))
+	switch(BmSeq_Decode(o, w->bmpNo, w->no, w->frame))
 	{
 		case 0: w->result = 0; break;
 		case 0x80000003u: w->result = 3; break;
@@ -412,16 +419,101 @@ static const WaitVtbl_t WaitSeqDecode_Vtbl = {
 	WaitSeqDecode_Destroy, WaitSeqDecode_Poll, Wait_SetTimer, Wait_IsDirtyBase, Wait_OnMessage};
 
 // decode frame `frame` of sequence `no` into bitmap bmpNo on the next pass ("90 F6" after "80 53")
-Wait_t* WaitSeqDecode_New(Thread_t* t, int bmpNo, int no, uint32_t frame)
+Wait_t* WaitSeqDecode_New(OpenBGI_t* o, Thread_t* t, int bmpNo, int no, uint32_t frame)
 {
 	WaitSeqDecode_t* w = (WaitSeqDecode_t*)BGI_Alloc(sizeof *w);
-	WaitCounted_Ctor(&w->w, t);
-	WaitCount_Inc();
+	WaitCounted_Ctor(o, &w->w, t);
+	WaitCount_Inc(o);
 	w->w.vt = &WaitSeqDecode_Vtbl;
 	w->result = 0x7fffffffu;
 	w->bmpNo = bmpNo;
 	w->no = no;
 	w->frame = frame;
+	return &w->w;
+}
+
+/* "92 F1" with its flag set: a streamed movie is opened, not loaded.  The
+ * original reads the file's first 0x40 bytes, then the quantisation tables
+ * and the frame offsets, in two jobs of the loader thread, and makes the
+ * record of them; a frame is read from the file when it is decoded.  Here
+ * both reads happen on the first poll.  The result is pushed when the wait
+ * is released: 0 ok, 1 no file name, 2 not a streamed movie (a movie of
+ * type 0 is refused as well) or its head cannot be read. */
+typedef struct WaitSeqOpen
+{
+	Wait_t w;        // (WaitCounted)
+	char* arc;       // copies of the names (arc NULL: a loose file; name NULL: none was given)
+	char* name;
+	int32_t* outNo;  // receives the sequence number
+	int32_t* info;   // five words: width, height, mode, rate, frames
+	uint32_t result; // the code to push
+} WaitSeqOpen_t;
+
+static char* CopyName(const char* s)
+{
+	char* c = NULL;
+	if(s)
+	{
+		c = (char*)BGI_Alloc(strlen(s) + 1);
+		strcpy(c, s);
+	}
+	return c;
+}
+
+static void WaitSeqOpen_Destroy(OpenBGI_t* o, Wait_t* base)
+{
+	WaitSeqOpen_t* w = (WaitSeqOpen_t*)base;
+	Thread_Push(base->thread, w->result);
+	BGI_Free(w->arc);
+	BGI_Free(w->name);
+	WaitCount_Dec(o);
+	WaitCounted_Dtor(o, base);
+	BGI_Free(base);
+}
+
+// read the head and register the movie; 0 ok, 2 otherwise
+static uint32_t SeqOpen(OpenBGI_t* o, WaitSeqOpen_t* w)
+{
+	uint8_t header[0x40], *head;
+	uint32_t headSize, fileSize, r;
+	if(LoadFileRange(o, header, w->arc, w->name, 0, sizeof header) != 0)
+		return 2;
+	headSize = BfMovie_StreamedHeadSize(header);
+	fileSize = GetFileSizeFast(o, w->arc, w->name);
+	if(headSize == 0 || headSize > fileSize)
+		return 2;
+	head = (uint8_t*)BGI_Alloc(headSize);
+	memcpy(head, header, sizeof header);
+	r = 2;
+	if(LoadFileRange(o, head + sizeof header, w->arc, w->name, sizeof header, headSize - (uint32_t)sizeof header) == 0 &&
+		BmSeq_RegisterStreamed(o, head, headSize, w->arc, w->name, fileSize, w->outNo, w->info) == 0)
+		r = 0;
+	BGI_Free(head);
+	return r;
+}
+
+static int WaitSeqOpen_Poll(OpenBGI_t* o, Wait_t* base)
+{
+	WaitSeqOpen_t* w = (WaitSeqOpen_t*)base;
+	Wait_Tick(o, base);
+	w->result = w->name ? SeqOpen(o, w) : 1;
+	return 1;
+}
+
+static const WaitVtbl_t WaitSeqOpen_Vtbl = {WaitSeqOpen_Destroy, WaitSeqOpen_Poll, Wait_SetTimer, Wait_IsDirtyBase, Wait_OnMessage};
+
+// open the streamed BF_Movie file `name` of archive `arc` (NULL: a loose file) and register it ("92 F1" with its flag set)
+Wait_t* WaitSeqOpen_New(OpenBGI_t* o, Thread_t* t, const char* arc, const char* name, int32_t* outNo, int32_t* info)
+{
+	WaitSeqOpen_t* w = (WaitSeqOpen_t*)BGI_Alloc(sizeof *w);
+	WaitCounted_Ctor(o, &w->w, t);
+	WaitCount_Inc(o);
+	w->w.vt = &WaitSeqOpen_Vtbl;
+	w->arc = CopyName(arc);
+	w->name = CopyName(name);
+	w->outNo = outNo;
+	w->info = info;
+	w->result = 1;
 	return &w->w;
 }
 
@@ -436,5 +528,7 @@ const char* WaitLoad_ClassName(const WaitVtbl_t* vt)
 		return "WaitSeqLoad";
 	if(vt == &WaitSeqDecode_Vtbl)
 		return "WaitSeqDecode";
+	if(vt == &WaitSeqOpen_Vtbl)
+		return "WaitSeqOpen";
 	return NULL;
 }

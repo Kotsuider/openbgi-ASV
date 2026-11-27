@@ -4,10 +4,10 @@
 #include <android/bitmap.h>
 #include <pthread.h>
 #include <time.h>
-#include "bgi/engine.h"
-#include "bgi/version.h"
-#include "bgi/os.h"
-#include "bgi/os_wasm.h"
+#include "openbgi.h"
+#include "movie.h"
+#include "host/os.h"
+#include "host/os_wasm.h"
 #include <unistd.h>
 #include <errno.h>
 #include <stdarg.h>
@@ -18,7 +18,10 @@ static jclass activityClass;
 
 // Callbacks run on the engine thread. The UI thread queues touch input.
 static pthread_mutex_t inputLock = PTHREAD_MUTEX_INITIALIZER;
-typedef struct { int type, x, y, down, button; } Input;
+typedef struct
+{
+	int type, x, y, down, button;
+} Input;
 static Input input[128];
 static unsigned readInput, writeInput;
 static int closeRequested;
@@ -105,7 +108,8 @@ void WasmHostJs_SjisTable(uint32_t* table)
 void WasmJs_CanvasSetup(int w, int h, int visible, int fullscreen)
 {
 	(void)fullscreen;
-	(*env)->CallVoidMethod(env, activity, METHOD("canvasSetup", "(IIZ)V"), w, h, (jboolean)!!visible);
+	HostLog(ANDROID_LOG_DEBUG, "Canvas %dx%d visible=%d", w, h, visible);
+	(*env)->CallVoidMethod(env, activity, METHOD("canvasSetup", "(IIZ)V"), w, h, (jboolean) !!visible);
 }
 
 JNIEXPORT jboolean JNICALL Java_org_openbgi_MainActivity_copyFrame(JNIEnv* jni, jclass cls,
@@ -173,7 +177,8 @@ int Android_MovieFileOpen(const char* path)
 	char relative[0x800];
 	OsWasm_RelPath(path, relative, sizeof relative);
 	jstring name = (*env)->NewStringUTF(env, relative);
-	if(!name) return -1;
+	if(!name)
+		return -1;
 	int fd = (*env)->CallIntMethod(env, activity, METHOD("documentOpen", "(Ljava/lang/String;)I"), name);
 	(*env)->DeleteLocalRef(env, name);
 	return fd;
@@ -184,15 +189,26 @@ int Android_MovieOpen(const char* path)
 	jstring name = (*env)->NewStringUTF(env, path);
 	int result = (*env)->CallBooleanMethod(env, activity, METHOD("movieOpen", "(Ljava/lang/String;)Z"), name);
 	(*env)->DeleteLocalRef(env, name);
-	if(result) HostLog(ANDROID_LOG_INFO, "Android MediaPlayer opened %s", path);
+	if(result)
+		HostLog(ANDROID_LOG_INFO, "Android MediaPlayer opened %s", path);
 	return result;
 }
-int Android_MovieStart(int x, int y, int w, int h, int volume) {
+int Android_MovieStart(int x, int y, int w, int h, int volume)
+{
 	return (*env)->CallIntMethod(env, activity, METHOD("movieStart", "(IIIII)I"), x, y, w, h, volume);
 }
-void Android_MovieStop(void) { (*env)->CallVoidMethod(env, activity, METHOD("movieStop", "()V")); }
-int Android_MovieRunning(void) { return (*env)->CallBooleanMethod(env, activity, METHOD("movieRunning", "()Z")); }
-void Android_MovieVolume(int volume) { (*env)->CallVoidMethod(env, activity, METHOD("movieVolume", "(I)V"), volume); }
+void Android_MovieStop(void)
+{
+	(*env)->CallVoidMethod(env, activity, METHOD("movieStop", "()V"));
+}
+int Android_MovieRunning(void)
+{
+	return (*env)->CallBooleanMethod(env, activity, METHOD("movieRunning", "()Z"));
+}
+void Android_MovieVolume(int volume)
+{
+	(*env)->CallVoidMethod(env, activity, METHOD("movieVolume", "(I)V"), volume);
+}
 
 int WasmJs_FontAddFile(const char* path)
 {
@@ -241,10 +257,22 @@ void WasmJs_FontRender(int id, int cp, unsigned char* pixels, int pitch, int w, 
 	}
 }
 
-void WasmJs_SetTitle(const char* text) { HostLog(ANDROID_LOG_INFO, "%s", text); }
-int WasmJs_ScreenW(void) { return 1920; }
-int WasmJs_ScreenH(void) { return 1080; }
-void WasmJs_SetCursor(int visible) { (void)visible; }
+void WasmJs_SetTitle(const char* text)
+{
+	HostLog(ANDROID_LOG_INFO, "%s", text);
+}
+int WasmJs_ScreenW(void)
+{
+	return 1920;
+}
+int WasmJs_ScreenH(void)
+{
+	return 1080;
+}
+void WasmJs_SetCursor(int visible)
+{
+	(void)visible;
+}
 int WasmJs_Confirm(const char* text, const char* caption, int kind)
 {
 	HostLog(ANDROID_LOG_WARN, "%s: %s", caption, text);
@@ -252,15 +280,35 @@ int WasmJs_Confirm(const char* text, const char* caption, int kind)
 }
 int WasmJs_Prompt(const char* title, const char* initial, char* out, int n)
 {
-	(void)title; (void)initial; (void)out; (void)n;
+	(void)title;
+	(void)initial;
+	(void)out;
+	(void)n;
 	return 0;
 }
-void WasmJs_ClipboardWrite(const char* text) { (void)text; }
-void WasmJs_InstallInput(void) {}
-void WasmJs_OpenUrl(const char* url) { (void)url; }
-double WasmJs_DeviceMemoryBytes(void) { return 0; }
-void WasmJs_Ended(int code) { HostLog(ANDROID_LOG_INFO, "Engine exit: %d", code); }
-int WasmJs_AudioAvailable(void) { return 1; }
+void WasmJs_ClipboardWrite(const char* text)
+{
+	(void)text;
+}
+void WasmJs_InstallInput(void)
+{
+}
+void WasmJs_OpenUrl(const char* url)
+{
+	(void)url;
+}
+double WasmJs_DeviceMemoryBytes(void)
+{
+	return 0;
+}
+void WasmJs_Ended(int code)
+{
+	HostLog(ANDROID_LOG_INFO, "Engine exit: %d", code);
+}
+int WasmJs_AudioAvailable(void)
+{
+	return 1;
+}
 int WasmJs_AudioStart(int rate)
 {
 	return (*env)->CallBooleanMethod(env, activity, METHOD("audioStart", "(I)Z"), rate);
@@ -283,9 +331,17 @@ void WasmJs_AudioPush(const int16_t* pcm, int frames)
 	}
 }
 
+static int profileCount(void)
+{
+	int n = 0;
+	while(OpenBGI_ProfileName(n))
+		++n;
+	return n;
+}
+
 JNIEXPORT jobjectArray JNICALL Java_org_openbgi_LauncherActivity_engineProfiles(JNIEnv* jni, jclass cls)
 {
-	int count = Engine_ProfileCount();
+	int count = profileCount();
 	jclass stringClass = (*jni)->FindClass(jni, "java/lang/String");
 	(void)cls;
 	if(!stringClass)
@@ -293,7 +349,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_openbgi_LauncherActivity_engineProfiles(
 	jobjectArray names = (*jni)->NewObjectArray(jni, count, stringClass, NULL);
 	for(int i = 0; names && i < count; ++i)
 	{
-		jstring name = (*jni)->NewStringUTF(jni, Engine_ProfileAt(i)->name);
+		jstring name = (*jni)->NewStringUTF(jni, OpenBGI_ProfileName(i));
 		if(!name)
 			break;
 		(*jni)->SetObjectArrayElement(jni, names, i, name);
@@ -304,9 +360,17 @@ JNIEXPORT jobjectArray JNICALL Java_org_openbgi_LauncherActivity_engineProfiles(
 
 static jbyteArray directoryListing;
 
-int WasmHostJs_Connect(void) { return 1; }
-void WasmHostJs_OverlayMount(const char* dir) { (void)dir; }
-void WasmHostJs_OverlayChanged(void) {}
+int WasmHostJs_Connect(void)
+{
+	return 1;
+}
+void WasmHostJs_OverlayMount(const char* dir)
+{
+	(void)dir;
+}
+void WasmHostJs_OverlayChanged(void)
+{
+}
 
 int WasmHostJs_Stat(const char* path, uint32_t* out)
 {
@@ -362,6 +426,79 @@ void WasmHostJs_ListTake(void* dst)
 	}
 }
 
+static int PlayerOpen(void* user, const char* path)
+{
+	(void)user;
+	return Android_MovieOpen(path);
+}
+static int PlayerStart(void* user, int x, int y, int w, int h, int32_t volume, int32_t* length)
+{
+	(void)user;
+	int ms = Android_MovieStart(x, y, w, h, volume);
+	*length = ms > 0 ? ms : 0;
+	return ms >= 0;
+}
+static void PlayerStop(void* user)
+{
+	(void)user;
+	Android_MovieStop();
+}
+static int PlayerRunning(void* user)
+{
+	(void)user;
+	return Android_MovieRunning();
+}
+static void PlayerVolume(void* user, int32_t volume)
+{
+	(void)user;
+	Android_MovieVolume(volume);
+}
+static const OpenBGI_MoviePlayer_t player = {sizeof player, PlayerOpen, PlayerStart, PlayerStop, PlayerRunning, PlayerVolume};
+
+// The Android process hosts one game. These options belong to its font renderer.
+static void ConfigureFonts(const char* arguments)
+{
+	const char* p = arguments;
+	char file[1024] = "";
+	int automatic = 1;
+	unsetenv("OPENBGI_FONT_FACE");
+	unsetenv("OPENBGI_FONT_WEIGHT");
+	unsetenv("OPENBGI_FONT_CODEPAGE");
+	while(*p)
+	{
+		char token[1024];
+		size_t n = 0;
+		int quoted = 0;
+		while(*p == ' ' || *p == '\t')
+			++p;
+		while(*p && (quoted || (*p != ' ' && *p != '\t')))
+		{
+			if(*p == '"')
+				quoted = !quoted;
+			else if(n + 1 < sizeof token)
+				token[n++] = *p;
+			++p;
+		}
+		token[n] = 0;
+		if(!strncmp(token, "--font-file=", 12))
+			snprintf(file, sizeof file, "%s", token + 12);
+		else if(!strncmp(token, "--font-face=", 12))
+			setenv("OPENBGI_FONT_FACE", token + 12, 1);
+		else if(!strncmp(token, "--font-weight=", 14))
+			setenv("OPENBGI_FONT_WEIGHT", token + 14, 1);
+		else if(!strncmp(token, "--font-codepage=", 16))
+			setenv("OPENBGI_FONT_CODEPAGE", token + 16, 1);
+		else if(!strcmp(token, "--no-auto-font") || !strcmp(token, "--auto-font=0"))
+			automatic = 0;
+		else if(!strcmp(token, "--auto-font") || !strcmp(token, "--auto-font=1"))
+			automatic = 1;
+	}
+	if(file[0])
+		WasmJs_FontAddFile(file);
+	else if(automatic && !getenv("OPENBGI_FONT_FACE"))
+		(*env)->CallVoidMethod(env, activity, METHOD("fontAutoLoad", "()V"));
+}
+
 JNIEXPORT jint JNICALL Java_org_openbgi_MainActivity_runEngine(JNIEnv* jni, jobject obj,
 	jstring overlay, jstring profile, jstring arguments, jstring logPath)
 {
@@ -378,12 +515,14 @@ JNIEXPORT jint JNICALL Java_org_openbgi_MainActivity_runEngine(JNIEnv* jni, jobj
 		(*jni)->ReleaseStringUTFChars(jni, logPath, path);
 	}
 	int result = -1;
-	if(saves && engine && args && Engine_SelectProfile(engine))
+	if(saves && engine && args)
 	{
 		env = jni;
 		activity = obj;
 		activityClass = (*jni)->GetObjectClass(jni, obj);
+		ConfigureFonts(args);
 		OsWasm_SetOverlayRoot(saves);
+		HostLog(ANDROID_LOG_INFO, "Starting API %u.%u host", OPENBGI_API_MAJOR, OPENBGI_API_MINOR);
 		if(OS_Init())
 		{
 			size_t length = strlen(engine) + strlen(args) + sizeof("--engine= ");
@@ -391,7 +530,17 @@ JNIEXPORT jint JNICALL Java_org_openbgi_MainActivity_runEngine(JNIEnv* jni, jobj
 			if(options)
 			{
 				snprintf(options, length, "--engine=%s %s", engine, args);
-				result = Engine_Main(options);
+				HostLog(ANDROID_LOG_INFO, "Android files ready");
+				OpenBGI_Host_t host = *OS_Host();
+				host.moviePlayer = &player;
+				host.movieDecoder = Android_MpegDecoder();
+				OpenBGI_t* core = OpenBGI_New(&host);
+				if(core)
+				{
+					HostLog(ANDROID_LOG_INFO, "Running %s", options);
+					result = OS_RunEngine(core, options);
+					OpenBGI_Delete(core);
+				}
 				free(options);
 			}
 			OS_Shutdown();
@@ -404,4 +553,33 @@ JNIEXPORT jint JNICALL Java_org_openbgi_MainActivity_runEngine(JNIEnv* jni, jobj
 	if(saves)
 		(*jni)->ReleaseStringUTFChars(jni, overlay, saves);
 	return result;
+}
+
+void WasmJs_TextInput(int on, int x, int y, int w, int h)
+{
+	(void)on;
+	(void)x;
+	(void)y;
+	(void)w;
+	(void)h;
+}
+int WasmJs_FontAdd(const void* data, uint32_t size, const char* names)
+{
+	(void)names;
+	if(size > 64u * 1024 * 1024)
+		return 0;
+	jbyteArray bytes = (*env)->NewByteArray(env, (jsize)size);
+	if(!bytes)
+		return 0;
+	(*env)->SetByteArrayRegion(env, bytes, 0, size, data);
+	int ok = (*env)->CallBooleanMethod(env, activity, METHOD("fontAddMemory", "([B)Z"), bytes);
+	(*env)->DeleteLocalRef(env, bytes);
+	return ok;
+}
+
+int WasmJs_PadRead(int index, uint32_t* out)
+{
+	(void)index;
+	(void)out;
+	return 0;
 }
