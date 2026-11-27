@@ -429,12 +429,17 @@ public final class LibraryActivity extends LauncherActivity {
     private CheckBox configChoice, autoFontChoice;
     private Spinner configurationChoice;
     private String selectedConfiguration;
+    private String defaultArguments = "", recommendedEngine = "";
+    private GameConfigurations editingConfigurations;
+    private TextView createConfigButton, updateConfigButton, deleteConfigButton, fontParametersButton, fontSummary;
     private EditText argumentsField;
     private TextView coverButton, resetButton, fontButton, resetFontButton, fontLabel;
 
     private void editGame(Game game, Bundle state) {
         editingGame = game;
         editingUri = game.uri;
+        editingConfigurations = null;
+        defaultArguments = recommendedEngine = "";
         LinearLayout form = column();
         form.setPadding(dp(20), dp(8), dp(20), dp(8));
         TextView version = text(getString(R.string.loading), 14, muted);
@@ -461,6 +466,15 @@ public final class LibraryActivity extends LauncherActivity {
         selectedConfiguration = state == null ? game.configuration : state.getString("configuration", game.configuration);
         configuration.setEnabled(false);
         form.addView(configuration, new LinearLayout.LayoutParams(-1, dp(48)));
+        configuration.setContentDescription(getString(R.string.translation_config));
+        createConfigButton = formAction(R.string.create_config, accent, () -> editUserConfiguration(true));
+        updateConfigButton = formAction(R.string.update_config, accent, () -> editUserConfiguration(false));
+        deleteConfigButton = formAction(R.string.delete_config, warning, this::deleteUserConfiguration);
+        createConfigButton.setEnabled(false); updateConfigButton.setEnabled(false); deleteConfigButton.setEnabled(false);
+        updateConfigButton.setVisibility(View.GONE); deleteConfigButton.setVisibility(View.GONE);
+        form.addView(createConfigButton);
+        form.addView(updateConfigButton);
+        form.addView(deleteConfigButton);
         CheckBox automaticFont = new CheckBox(this);
         automaticFont.setText(R.string.auto_font);
         automaticFont.setButtonTintList(ColorStateList.valueOf(accent));
@@ -477,6 +491,12 @@ public final class LibraryActivity extends LauncherActivity {
         form.addView(formAction(R.string.system_font, accent, () -> chooseSystemFont(game)),
                 new LinearLayout.LayoutParams(-1, -2));
         form.addView(resetFontButton);
+        fontParametersButton = formAction(R.string.font_parameters, accent, this::editFontParameters);
+        fontParametersButton.setEnabled(false);
+        form.addView(fontParametersButton);
+        fontSummary = text("", 13, muted);
+        form.addView(fontSummary);
+
 
         CheckBox config = new CheckBox(this);
         config.setText(R.string.use_config);
@@ -492,16 +512,20 @@ public final class LibraryActivity extends LauncherActivity {
         argumentsField = args;
         customArguments = state == null ? (game.arguments == null ? "" : game.arguments)
                 : state.getString("arguments", "");
-        String[] defaults = {""};
-        String[] recommendedEngine = {""};
         args.setEnabled(!config.isChecked());
-        args.setText(config.isChecked() ? defaults[0] : customArguments);
+        args.setText(config.isChecked() ? defaultArguments : customArguments);
         form.addView(args, new LinearLayout.LayoutParams(-1, -2));
         config.setOnCheckedChangeListener((button, checked) -> {
             if (checked) customArguments = args.getText().toString();
-            args.setText(checked || customArguments.isEmpty() ? defaults[0] : customArguments);
+            args.setText(checked || customArguments.isEmpty() ? defaultArguments : customArguments);
             args.setEnabled(!checked);
         });
+        args.addTextChangedListener(new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence value, int start, int count, int after) { }
+            public void onTextChanged(CharSequence value, int start, int before, int count) { updateFontSummary(); }
+            public void afterTextChanged(android.text.Editable value) { }
+        });
+        updateFontSummary();
 
         View separator = new View(this);
         separator.setBackgroundColor(outlineColor());
@@ -531,7 +555,7 @@ public final class LibraryActivity extends LauncherActivity {
                     game.profile = index > 0 ? profiles[index - 1] : null;
                     game.arguments = config.isChecked() ? null : args.getText().toString();
                     game.configuration = selectedConfiguration;
-                    game.profileOverride = game.profile == null || !game.profile.equals(recommendedEngine[0]);
+                    game.profileOverride = game.profile == null || !game.profile.equals(recommendedEngine);
                     game.autoFont = automaticFont.isChecked();
                     saveGames(game.uri);
                     showLauncher(null);
@@ -546,43 +570,191 @@ public final class LibraryActivity extends LauncherActivity {
             GameConfigurations configurations = new GameConfigurations(this, docs);
             BgiVersion detected = BgiVersion.detect(docs, profiles);
             runOnUiThread(() -> {
-                if (!dialog.isShowing() || isDestroyed()) return;
-                ArrayAdapter<GameConfigurations.Option> configAdapter = new ArrayAdapter<>(this,
-                        android.R.layout.simple_spinner_item, configurations.options);
-                configAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                configuration.setAdapter(configAdapter);
-                int selectedConfig = configurations.options.size() - 1;
-                for (int i = 0; i < configurations.options.size(); i++)
-                    if (configurations.options.get(i).id.equals(selectedConfiguration)) selectedConfig = i;
-                selectedConfiguration = configurations.options.get(selectedConfig).id;
-                configuration.setSelection(selectedConfig);
-                configuration.setEnabled(true);
-                GameConfigurations.Option initial = configurations.resolve(selectedConfiguration);
-                defaults[0] = initial.arguments;
-                recommendedEngine[0] = initial.engine;
-                int recommendedIndex = adapter.getPosition(initial.engine);
+                if (!dialog.isShowing() || editor != dialog || isDestroyed()) return;
+                bindConfigurations(configurations);
+                int recommendedIndex = adapter.getPosition(recommendedEngine);
                 if (state == null && !game.profileOverride && recommendedIndex > 0) profile.setSelection(recommendedIndex);
-                if (config.isChecked()) args.setText(defaults[0]);
-                configuration.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                    @Override public void onNothingSelected(AdapterView<?> parent) { }
-                    @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                        String next = configurations.options.get(position).id;
-                        boolean changed = !next.equals(selectedConfiguration);
-                        selectedConfiguration = next;
-                        GameConfigurations.Option option = configurations.resolve(next);
-                        defaults[0] = option.arguments;
-                        recommendedEngine[0] = option.engine;
-                        if (config.isChecked()) args.setText(defaults[0]);
-                        int engineIndex = adapter.getPosition(option.engine);
-                        if (changed && engineIndex > 0) profile.setSelection(engineIndex);
-                    }
-                });
                 showVersion(version, detected);
                 int match = adapter.getPosition(detected.profile);
                 detectedButton.setEnabled(match > 0);
                 detectedButton.setOnClickListener(view -> profile.setSelection(match));
             });
         });
+    }
+
+    private void bindConfigurations(GameConfigurations configurations) {
+        editingConfigurations = configurations;
+        configurationChoice.setOnItemSelectedListener(null);
+        ArrayAdapter<GameConfigurations.Option> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, configurations.options);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        configurationChoice.setAdapter(adapter);
+        int selected = configurations.options.size() - 1;
+        for (int i = 0; i < configurations.options.size(); i++)
+            if (configurations.options.get(i).id.equals(selectedConfiguration)) selected = i;
+        selectedConfiguration = configurations.options.get(selected).id;
+        configurationChoice.setSelection(selected);
+        configurationChoice.setEnabled(true);
+        fontParametersButton.setEnabled(true);
+        createConfigButton.setEnabled(true);
+        applyConfiguration(configurations.resolve(selectedConfiguration), false);
+        configurationChoice.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            public void onNothingSelected(AdapterView<?> parent) { }
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String next = editingConfigurations.options.get(position).id;
+                boolean changed = !next.equals(selectedConfiguration);
+                selectedConfiguration = next;
+                applyConfiguration(editingConfigurations.resolve(next), changed);
+            }
+        });
+    }
+
+    private void applyConfiguration(GameConfigurations.Option option, boolean changed) {
+        defaultArguments = option.arguments;
+        recommendedEngine = option.engine;
+        if (configChoice.isChecked()) argumentsField.setText(defaultArguments);
+        if (changed) autoFontChoice.setChecked(option.autoFont);
+        else if (!option.autoFont) autoFontChoice.setChecked(false);
+        if (changed && !option.engine.isEmpty()) {
+            for (int i = 0; i < profiles.length; i++) if (option.engine.equals(profiles[i])) profileChoice.setSelection(i + 1);
+        }
+        boolean user = selectedConfiguration.startsWith("user:") && option.id.equals(selectedConfiguration);
+        updateConfigButton.setEnabled(user);
+        deleteConfigButton.setEnabled(user);
+        updateConfigButton.setVisibility(user ? View.VISIBLE : View.GONE);
+        deleteConfigButton.setVisibility(user ? View.VISIBLE : View.GONE);
+    }
+
+    private void reloadConfigurations() {
+        AlertDialog target = editor;
+        String uri = editingUri;
+        configurationChoice.setEnabled(false);
+        createConfigButton.setEnabled(false); updateConfigButton.setEnabled(false); deleteConfigButton.setEnabled(false);
+        io.execute(() -> {
+            GameConfigurations configs = new GameConfigurations(this, new GameDocuments(getContentResolver(), Uri.parse(uri)));
+            runOnUiThread(() -> {
+                if (editor == target && target.isShowing() && !isDestroyed()) bindConfigurations(configs);
+            });
+        });
+    }
+
+    private void editUserConfiguration(boolean create) {
+        if (editingConfigurations == null) return;
+        GameConfigurations.Option source = editingConfigurations.resolve(selectedConfiguration);
+        if (!create && !source.id.startsWith("user:")) return;
+        LinearLayout form = column();
+        form.setPadding(dp(20), dp(8), dp(20), dp(8));
+        form.addView(text(getString(R.string.config_snapshot_hint), 14, muted));
+        EditText name = new EditText(this);
+        name.setHint(R.string.config_name);
+        name.setContentDescription(getString(R.string.config_name));
+        name.setSingleLine(true);
+        name.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(80)});
+        if (!create) name.setText(source.name);
+        form.addView(name);
+        String arguments = argumentsField.getText().toString();
+        int index = profileChoice.getSelectedItemPosition();
+        String engine = index > 0 ? profiles[index - 1] : "";
+        boolean auto = autoFontChoice.isChecked();
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(create ? R.string.create_config : R.string.update_config).setView(form)
+                .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.save, null).create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+            if (name.getText().toString().trim().isEmpty()) { name.setError(getString(R.string.config_name_required)); return; }
+            try {
+                selectedConfiguration = new UserConfigurations(this).save(create ? null : source.id,
+                        name.getText().toString(), arguments, engine, source.uif, auto);
+                configChoice.setChecked(true);
+                dialog.dismiss();
+                reloadConfigurations();
+            } catch (Exception error) {
+                android.util.Log.e("OpenBGI", "Cannot save user configuration", error);
+                Toast.makeText(this, R.string.config_storage_error, Toast.LENGTH_LONG).show();
+            }
+        }));
+        dialog.show();
+    }
+
+    private void deleteUserConfiguration() {
+        if (editingConfigurations == null || !selectedConfiguration.startsWith("user:")) return;
+        String id = selectedConfiguration;
+        GameConfigurations.Option source = editingConfigurations.resolve(id);
+        new AlertDialog.Builder(this).setTitle(R.string.delete_config)
+                .setMessage(getString(R.string.delete_config_message, source.name))
+                .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.remove, (dialog, which) -> {
+                    try {
+                        new UserConfigurations(this).delete(id);
+                        for (Game game : games) if (id.equals(game.configuration)) game.configuration = "none";
+                        saveGames(editingUri);
+                        selectedConfiguration = "none";
+                        reloadConfigurations();
+                    } catch (Exception error) {
+                        android.util.Log.e("OpenBGI", "Cannot delete user configuration", error);
+                        Toast.makeText(this, R.string.config_storage_error, Toast.LENGTH_LONG).show();
+                    }
+                }).show();
+    }
+
+    private void updateFontSummary() {
+        if (fontSummary == null) return;
+        try {
+            String[] values = FontArguments.read(argumentsField.getText().toString());
+            fontSummary.setText(getString(R.string.font_parameters_summary,
+                    values[0].isEmpty() ? getString(R.string.font_game_default) : values[0],
+                    values[1].isEmpty() ? getString(R.string.font_game_default) : values[1].equals("0") ? getString(R.string.font_natural) : values[1],
+                    values[2].isEmpty() ? getString(R.string.font_game_default) : values[2], values[3].isEmpty() ? getString(R.string.font_game_default) : values[3]));
+        } catch (IllegalArgumentException error) { fontSummary.setText(R.string.font_arguments_invalid); }
+    }
+
+    private void editFontParameters() {
+        String arguments = argumentsField.getText().toString();
+        String[] values;
+        try { values = FontArguments.read(arguments); }
+        catch (IllegalArgumentException error) { Toast.makeText(this, R.string.font_arguments_invalid, Toast.LENGTH_LONG).show(); return; }
+        LinearLayout form = column();
+        form.setPadding(dp(20), dp(8), dp(20), dp(8));
+        form.addView(text(getString(R.string.font_parameters_hint), 14, muted));
+        int[] titles = {R.string.font_size, R.string.font_width, R.string.font_spacing, R.string.font_weight};
+        int[] hints = {R.string.font_size_hint, R.string.font_width_hint, R.string.font_spacing_hint, R.string.font_weight_hint};
+        EditText[] fields = new EditText[values.length];
+        for (int i = 0; i < values.length; i++) {
+            form.addView(text(getString(titles[i]), 16, ink));
+            form.addView(text(getString(hints[i]), 13, muted));
+            EditText field = new EditText(this);
+            field.setSingleLine(true);
+            field.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | (i == 2 ? android.text.InputType.TYPE_NUMBER_FLAG_SIGNED : 0));
+            field.setHint(R.string.font_game_default);
+            field.setContentDescription(getString(titles[i]));
+            field.setText(values[i]);
+            fields[i] = field;
+            form.addView(field);
+        }
+        form.addView(formAction(R.string.font_reset_parameters, accent, () -> {
+            for (EditText field : fields) field.setText("");
+        }));
+        ScrollView scroll = new ScrollView(this); scroll.addView(form);
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle(R.string.font_parameters).setView(scroll)
+                .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.apply, null).create();
+        dialog.setOnShowListener(ignored -> {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+                String[] edited = new String[fields.length];
+                boolean valid = true;
+                for (int i = 0; i < fields.length; i++) {
+                    try { edited[i] = FontArguments.validate(i, fields[i].getText().toString()); fields[i].setError(null); }
+                    catch (IllegalArgumentException error) {
+                        fields[i].setError(getString(R.string.font_value_range, FontArguments.MIN[i], FontArguments.MAX[i]));
+                        valid = false;
+                    }
+                }
+                if (!valid) return;
+                String updated = FontArguments.apply(arguments, edited);
+                configChoice.setChecked(false);
+                argumentsField.setText(updated);
+                dialog.dismiss();
+            });
+        });
+        dialog.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+        dialog.show();
     }
 
     private void chooseSystemFont(Game game) {

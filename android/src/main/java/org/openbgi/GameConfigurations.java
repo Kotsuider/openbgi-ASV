@@ -12,10 +12,11 @@ import org.json.JSONObject;
 /** Translation presets are independent of VM/engine profiles. */
 final class GameConfigurations {
     static final class Option {
-        final String id, label, arguments, engine, uif;
+        final String id, label, name, arguments, engine, uif;
         final boolean autoFont;
         Option(String id, String label, JSONObject data, String uif) {
             this.id = id; this.label = label; this.uif = uif;
+            name = data.optString("name", label);
             arguments = data.optString("arguments", "");
             engine = data.optString("engine", "");
             autoFont = data.optBoolean("auto_font", true);
@@ -71,6 +72,15 @@ final class GameConfigurations {
         if (foundUif != null) options.add(foundUif);
         if (foundLocal != null) options.add(foundLocal);
         options.addAll(presets);
+        try {
+            JSONArray users = new UserConfigurations(context).list();
+            for (int i = 0; i < users.length(); i++) {
+                JSONObject entry = users.getJSONObject(i);
+                String id = entry.getString("id");
+                if (id.startsWith("user:")) options.add(new Option(id,
+                        context.getString(R.string.user_config_label, entry.getString("name")), entry, entry.optString("uif", "")));
+            }
+        } catch (Exception error) { android.util.Log.e("OpenBGI", "Cannot load user configurations", error); }
         options.add(none);
     }
     Option resolve(String id) {

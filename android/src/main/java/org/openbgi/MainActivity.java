@@ -64,6 +64,15 @@ public final class MainActivity extends Activity {
             }
             String override = getIntent().getStringExtra("arguments");
             String launchArguments = override == null ? config.arguments : override;
+            org.json.JSONObject localConfig = TranslationConfig.read(documents, GameLaunchConfig.FILE);
+            if (!launchArguments.contains("--letter-spacing=")) {
+                Object spacing = localConfig.opt("letter_spacing");
+                if (spacing instanceof Number) {
+                    double value = ((Number) spacing).doubleValue();
+                    if (value == Math.rint(value) && value >= -16 && value <= 64)
+                        launchArguments += " --letter-spacing=" + (int)value;
+                }
+            }
             translation = new TranslationConfig(documents, config.uif);
             manualTypeface = GameFont.load(this, tree.toString());
             if (!getIntent().getBooleanExtra("autoFont", true) || !config.autoFont || translation.hasFont() || manualTypeface != null)
@@ -86,7 +95,7 @@ public final class MainActivity extends Activity {
                 } catch (java.io.IOException error) { android.util.Log.w("OpenBGI", "Cannot log game font", error); }
             }
             int result = runEngine(overlay.getAbsolutePath(), profile,
-                    launchArguments, log.getAbsolutePath());
+                    "--movies=player " + launchArguments, log.getAbsolutePath());
             runOnUiThread(() -> {
                 if (result != 0) android.util.Log.w("OpenBGI", "Engine exit: " + result);
                 finish();
@@ -171,6 +180,22 @@ public final class MainActivity extends Activity {
             }
         }
         return table;
+    }
+
+    private boolean fontAddMemory(byte[] data) {
+        try {
+            File file = File.createTempFile("engine-font-", ".ttf", getCacheDir());
+            try (java.io.FileOutputStream out = new java.io.FileOutputStream(file)) { out.write(data); }
+            Typeface loaded = Typeface.createFromFile(file);
+            // Explicit selections and translation fonts keep priority over engine defaults.
+            if (externalTypeface == null && manualTypeface == null && !translation.hasFont()) externalTypeface = loaded;
+            file.delete();
+            return true;
+        } catch (java.io.IOException | RuntimeException error) { return false; }
+    }
+
+    private void fontAutoLoad() {
+        for (String path : documents.fontFiles()) if (fontAddFile(path)) return;
     }
 
     private boolean fontAddFile(String path) {

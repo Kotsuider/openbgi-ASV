@@ -104,6 +104,24 @@ final class GameDocuments {
         return files;
     }
 
+    List<String> fontFiles() {
+        List<String> paths = new ArrayList<>();
+        List<String> queue = new ArrayList<>(); queue.add("");
+        for (int head = 0; head < queue.size() && head < 4096; head++) {
+            String prefix = queue.get(head);
+            Entry dir = find(prefix);
+            if (dir == null) continue;
+            List<Entry> entries = new ArrayList<>(children(dir));
+            entries.sort((a, b) -> a.name.compareTo(b.name));
+            for (Entry entry : entries) {
+                String path = prefix.isEmpty() ? entry.name : prefix + "/" + entry.name;
+                if (entry.attrs == 16) { if (queue.size() < 4096 && path.split("/").length < 16) queue.add(path); }
+                else if (path.toLowerCase(Locale.ROOT).matches(".*\\.(ttf|otf|ttc)$")) paths.add(path);
+            }
+        }
+        return paths;
+    }
+
     boolean isGame() {
         return stat("system.arc") != null || stat("ipl._bp") != null;
     }

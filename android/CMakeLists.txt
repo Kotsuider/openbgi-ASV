@@ -1,55 +1,50 @@
 cmake_minimum_required(VERSION 3.22)
 project(OpenBGIAndroid LANGUAGES C)
-
-# The single-config Ninja build otherwise emits unoptimised native code.
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Native build type" FORCE)
 endif()
-
-if(NOT ANDROID)
+option(BGI_NATIVE_TESTS "Build portable core regression tests on the host" OFF)
+if(NOT ANDROID AND NOT BGI_NATIVE_TESTS)
     message(FATAL_ERROR "Configure with the Android NDK CMake toolchain")
 endif()
-
 set(BGI_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
-set(BGI_SOURCE_DIRS
-    asm bpc core dbg dbg/views dump gfx gfx/background gfx/mgr gfx/particle
-    gfx/text gfx/window scn snd snd/bw snd/wm sys sys/install sysobj vm wait
-)
-set(BGI_SOURCES "${BGI_ROOT}/src/os/os_common.c")
+set(BGI_SOURCE_DIRS base fs core asm scn bpc vm wait sys sys/install sysobj gfx gfx/background gfx/mgr gfx/particle gfx/window gfx/text snd snd/bw snd/wm ui)
+set(BGI_SOURCES)
 foreach(directory IN LISTS BGI_SOURCE_DIRS)
     file(GLOB sources CONFIGURE_DEPENDS "${BGI_ROOT}/src/${directory}/*.c")
     list(APPEND BGI_SOURCES ${sources})
 endforeach()
-
-# The Android host will own the application lifecycle and call the engine.
-list(REMOVE_ITEM BGI_SOURCES "${BGI_ROOT}/src/sys/main.c")
-
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/gen")
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/gen/embfonts.c" "#include \"bgi/embfonts.h\"\nconst EmbeddedFont_t gEmbeddedFonts[1] = {{0}};\nconst int gEmbeddedFontCount = 0;\n")
+add_library(openbgi_core STATIC ${BGI_SOURCES} "${CMAKE_CURRENT_BINARY_DIR}/gen/embfonts.c")
+set_target_properties(openbgi_core PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED YES C_EXTENSIONS NO POSITION_INDEPENDENT_CODE YES)
+target_include_directories(openbgi_core PUBLIC "${BGI_ROOT}/include" "${BGI_ROOT}/src/include")
+target_compile_definitions(openbgi_core PRIVATE BGI_NO_DEBUGGER BGI_USE_STB_VORBIS)
 option(BGI_ANDROID_APP "Build the Android activity library" OFF)
 if(BGI_ANDROID_APP)
-    list(FILTER BGI_SOURCES EXCLUDE REGEX "/src/(dbg|dump)/")
+    file(GLOB BGI_COMMON "${BGI_ROOT}/src/host/*.c")
+    file(GLOB BGI_HOST "${BGI_ROOT}/src/host/wasm/*.c")
+    list(REMOVE_ITEM BGI_HOST "${BGI_ROOT}/src/host/wasm/main.c")
+    add_library(openbgi_android SHARED host.c movie.c ${BGI_COMMON} ${BGI_HOST})
+    target_include_directories(openbgi_android PRIVATE "${BGI_ROOT}/src" "${BGI_ROOT}/tools/wasmstub")
+    target_compile_definitions(openbgi_android PRIVATE BGI_WASM BGI_ANDROID BGI_ANDROID_APP BGI_NO_DEBUGGER _POSIX_C_SOURCE=200809L)
+    target_link_options(openbgi_android PRIVATE "-Wl,--no-undefined")
+    target_link_libraries(openbgi_android PRIVATE openbgi_core jnigraphics log m)
 endif()
 
-add_library(openbgi_core STATIC ${BGI_SOURCES})
-set_target_properties(openbgi_core PROPERTIES
-    C_STANDARD 99
-    C_STANDARD_REQUIRED YES
-    C_EXTENSIONS NO
-    POSITION_INDEPENDENT_CODE YES
-)
-target_include_directories(openbgi_core PUBLIC "${BGI_ROOT}/inc")
-target_compile_definitions(openbgi_core PRIVATE _POSIX_C_SOURCE=200809L)
-
-if(BGI_ANDROID_APP)
-    if(ANDROID_PLATFORM_LEVEL LESS 28)
-        message(FATAL_ERROR "The Android host requires API 28")
-    endif()
-    if(NOT EXISTS "${BGI_ROOT}/src/snd/stb_vorbis.c")
-        message(FATAL_ERROR "Missing stb_vorbis.c. Run android/build-apk.ps1 to fetch it.")
-    endif()
-    target_compile_definitions(openbgi_core PRIVATE BGI_WASM BGI_ANDROID BGI_USE_STB_VORBIS)
-    file(GLOB BGI_HOST_SOURCES CONFIGURE_DEPENDS "${BGI_ROOT}/src/os/wasm/*.c")
-    add_library(openbgi_android SHARED host.c ${BGI_HOST_SOURCES})
-    target_include_directories(openbgi_android PRIVATE "${BGI_ROOT}" "${BGI_ROOT}/tools/wasmstub")
-    target_compile_definitions(openbgi_android PRIVATE BGI_WASM BGI_ANDROID _POSIX_C_SOURCE=200809L)
-    target_link_libraries(openbgi_android PRIVATE openbgi_core jnigraphics log m)
+if(BGI_NATIVE_TESTS)
+    enable_testing()
+    target_link_libraries(openbgi_core PUBLIC m)
+    add_executable(test_core "${BGI_ROOT}/tests/core.c")
+    target_link_libraries(test_core PRIVATE openbgi_core)
+    add_test(NAME core COMMAND test_core)
+    add_executable(test_android_text "${BGI_ROOT}/tests/android_text.c")
+    target_link_libraries(test_android_text PRIVATE openbgi_core)
+    add_test(NAME android_text COMMAND test_android_text)
+    add_executable(test_android_compat "${BGI_ROOT}/tests/android_compat.c")
+    target_link_libraries(test_android_compat PRIVATE openbgi_core)
+    add_test(NAME android_compat COMMAND test_android_compat)
+    add_executable(test_android_movie "${BGI_ROOT}/tests/android_movie.c" movie.c)
+    target_include_directories(test_android_movie PRIVATE "${BGI_ROOT}/include" "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(test_android_movie PRIVATE m)
 endif()

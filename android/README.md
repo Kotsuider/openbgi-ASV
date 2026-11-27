@@ -1,8 +1,12 @@
 # Android core build
 
 This target compiles the engine to an ARM64 static library. The APK build
-links the same engine to the Android host, which supplies the OS
-interface and calls `Engine_Main` from the game activity.
+links the same engine to the Android host. The JNI bridge creates an engine
+with `OpenBGI_New` and runs it through the v1.0 API using the shared host loop.
+The core has no Android or WASM platform defines; the host reuses the upstream
+WASM file/window services with Android JNI implementations of their callbacks.
+The `BGI_ANDROID_APP` host define enables the window table (upstream Android
+CLI builds intentionally have none).
 
 From the repository root, with NDK r26b and SDK CMake 3.22.1 installed:
 
@@ -28,7 +32,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File android/build-apk.ps1
 
 Pass `-Gradle <path-to-gradle.bat>` to use an existing Gradle installation.
 The resulting `bin/openbgi-android-debug.apk` requires an ARM64 device
-running Android 9 or later. The debug signing key stays in `obj/android-app`.
+running Android 9 or later. The debug signing key stays in `obj/android-api-v1`.
 
 In the launcher, tap **+**, select the folder containing your game files in Android's
 system picker and grant read access. Select the game and engine profile,
@@ -79,10 +83,6 @@ See [third-party notices](THIRD_PARTY_NOTICES.md) for source and notice
 requirements when distributing an APK.
 
 ## Translation patches
-
-See [translation patch methods](../README.md#translation-patch-methods)
-for the UIF/H2O, modified-EXE/Itsusora and font-proxy/Eustia examples,
-including the Windows launch commands and platform-specific support.
 
 Place the translation's `patch` directory, JSON configuration and any
 configured fonts in the selected game folder. The application checks
@@ -246,8 +246,9 @@ frames through OpenBGI, and sends PCM through the engine mixer. Movie
 volume, script stop/skip and completion use the existing movie interface.
 Neither `ffmpeg` nor `ffprobe` is required for these Android playback paths.
 
-The separate archive-entry movie command and video textures remain
-unsupported. BF_Movie bitmap sequences keep their existing decoder.
+Video textures remain unsupported. BF_Movie bitmap sequences use the upstream
+decoder. MPEG movie files are read through the public movie-file interface,
+including sources the engine can read from archives.
 
 Native APK builds default to `RelWithDebInfo` (`-O2`). MPEG playback keeps
 the selected document descriptor open for the duration of the movie and
@@ -275,8 +276,65 @@ Suika opening segment. At 30 fps the frame interval is approximately
 33.3 ms. Decode/output timing covers the engine path; it does not measure
 final on-screen presentation or guarantee smooth playback on every device.
 
-For a decoder regression check on a desktop build, run `bin/test_mpeg`
-with `BGI_MPEG_FILE` pointing to an MPEG-1/MP2 fixture, or pass its path as
-the first argument. It checks decoding of four seconds of video/audio.
-Without a fixture, the malformed-input check runs and the media check is
-reported as skipped. No game video is bundled with the tests or APK.
+For portable regression checks (a host C compiler, CMake and Ninja required):
+
+```powershell
+python tools/mkmsg.py
+cmake -S android -B obj/android-api-tests -G Ninja -DBGI_NATIVE_TESTS=ON
+cmake --build obj/android-api-tests
+ctest --test-dir obj/android-api-tests --output-on-failure
+obj/android-api-tests/test_android_movie.exe path/to/MPEG1-MP2.mpg
+```
+
+The tests cover the upstream core lifecycle/API contract, Cyrillic word runs,
+font option boundaries and engine isolation, compact instructions of 1.685,
+pointer pools, display sizes, bytecode decoding and streamed movie playback.
+No game media is bundled with tests or the APK.
+
+`src/androidTest/` contains an optional adb smoke driver. Build it with
+`assembleDebugAndroidTest`, install the test APK and pass a game tree URI
+for which the app already has a persisted grant:
+
+```text
+adb shell am instrument -w -e tree CONTENT_URI -e profile 1.529 -e wait 30000 org.openbgi.test/org.openbgi.SmokeInstrumentation
+```
+
+The driver saves `files/smoke-last.png` before it ends. Instrumentation ending
+stops the app's processes; this is not a game crash. Optional `configuration`,
+`arguments`, `tapX` and `tapY` extras select a preset/arguments and tap once after
+the wait, then capture after another ten seconds. The driver is not in the app APK.
+See [migration notes](../RELEASE_NOTES_v0.4.md) for the scope of validation.
+
+
+## Font controls and user configurations
+
+Open game settings (long-press a library card, or tap the profile in Folders)
+and choose **Text and font parameters**. The fields control glyph height,
+width, letter spacing including spaces, and weight. Their ranges and examples
+are shown beside them; 0 width uses natural font proportions. Empty fields
+remove the corresponding override. Apply, then save game settings. Other
+launch arguments and quoted font paths are preserved. Advanced arguments
+remain editable and the font controls read their current values.
+
+**Save as new configuration** stores the current arguments, engine profile,
+automatic font setting and selected UIF path under a name. User configurations
+appear as **My configuration · Name** and can be used by other games. Select
+one to update or delete it. Built-in presets and game JSON files are read-only
+in this editor; use them as a starting point for a new configuration.
+Configurations are private app preferences, not files written to the game
+folder. Imported font files and manually chosen system fonts remain per-game
+settings. Deleting a user configuration switches its games to None after a
+confirmation; manual arguments and font selections are kept.
+
+The argument editing tests run with the JDK alone:
+
+```powershell
+javac -encoding UTF-8 -d obj/android-java-tests android/src/main/java/org/openbgi/FontArguments.java tests/android/FontArgumentsTest.java
+java -cp obj/android-java-tests org.openbgi.FontArgumentsTest
+```
+
+The instrumentation driver supports `-e mode settings` for isolated storage
+checks, and `-e mode editor -e tree CONTENT_URI` for numeric validation and
+create/update/delete through the actual UI. The UI test cancels game settings
+and removes its own temporary configurations. It stores `settings-font-ui.png`
+and `settings-config-ui.png` in app files for visual inspection.
